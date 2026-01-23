@@ -1,0 +1,28 @@
+# macOS garbage
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Icon files
+Icon?
+
+# Thumbnails
+._*
+
+# Spotlight
+.Spotlight-V100
+
+# Trash
+.Trashes
+
+# Editor junk
+.vscode/
+.idea/
+
+# Logs
+*.log
+
+# Node / tooling (just in case you level up later)
+node_modules/
+dist/
+build/
