@@ -12,6 +12,7 @@
   }
 
   h2 {
+    font-size: 50px;
     text-align: center;
     margin-bottom: 20px;
     color: black
@@ -21,5 +22,65 @@
     text-align: center;
     margin-bottom: 20px;
     color: black;
+    font-size: 20px;
   }
 
+  #home{
+    margin-top: 150px;
+  }
+
+  .features-container {
+    display: flex;
+    gap: 20px; /* Space between cards */
+    padding: 40px;
+    background-color: #fdfaf5; /* The light cream background */
+    justify-content: center;
+  }
+  
+  .feature-card {
+    background: white;
+    border: 1px solid #eee;
+    border-radius: 12px;
+    padding: 30px;
+    flex: 1; /* Makes all cards equal width */
+    max-width: 350px;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.02);
+    transition: transform 0.3s ease-out, box-shadow 0.3s ease-out;
+    background: white;
+     border-radius: 16px;
+  }
+  
+  .icon-box {
+    width: 50px;
+    height: 50px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 20px;
+  }
+  
+  /* Specific background colors for icons */
+  .blue-bg { background-color: #eef7fb; color: #3498db; }
+  .orange-bg { background-color: #fef5e7; color: #f39c12; }
+  .red-bg { background-color: #fdeced; color: #e74c3c; }
+  
+  h3 {
+    font-family: sans-serif;
+    font-size: 1.25rem;
+    margin-bottom: 12px;
+    color: #222;
+  }
+  
+  p {
+    color: #666;
+    line-height: 1.6;
+  }
+
+  .feature-card:hover {
+    /* 3. The Lift */
+    transform: translateY(-12px); 
+    
+    /* 4. The Deep Shadow */
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.12);
+  }
