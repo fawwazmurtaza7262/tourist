@@ -70,6 +70,7 @@
         max-width: 1200px;
         padding: 40px 20px;
         margin: 0 auto; /* THIS is the centering fix */
+        margin-top: 150px;
       }
   
       .how-it-works h2 {
