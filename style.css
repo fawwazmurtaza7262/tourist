@@ -153,12 +153,14 @@
       .cta-section h2 {
         font-size: 64px;
         margin-bottom: 20px;
+        color: white;
       }
       
       .cta-section p {
         font-size: 20px;
         max-width: 700px;
         margin-bottom: 20px;
+        color: white;
       }
       
       .cta-section button {
