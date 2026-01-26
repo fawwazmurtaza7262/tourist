@@ -49,7 +49,6 @@
   }
   
   .destination-card {
-    background: white;
     border-radius: 16px;
     box-shadow: 0 6px 15px rgba(0,0,0,0.06);
     overflow: hidden;
@@ -76,7 +75,7 @@
   
   .destination-card p {
     margin: 6px 0;
-    color: #555; 
+    color: white; 
   }
   
   .price {
@@ -102,6 +101,16 @@
     font-size: 2.8rem;
     text-align: center;
     margin-bottom: 10px;
+    background: linear-gradient(
+          90deg,
+          #00c6ff,
+          #f25f3a
+        );
+        color: white;
+  }
+
+  .page-title p{
+    color: white;
   }
   
   .page-subtitle {
@@ -115,7 +124,12 @@
     display: flex;
     justify-content: center;
     padding: 40px 20px;
-    background-color: #fdf8f5; /* Light cream background from image */
+    background: linear-gradient(
+          90deg,
+          #00c6ff,
+          #f25f3a
+        );
+        color: white;
   }
   
   .search-card {
@@ -225,5 +239,7 @@
       grid-template-columns: 1fr;
     }
   }
+
+  
   
   
