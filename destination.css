@@ -1,0 +1,229 @@
+.nav {
+    display: flex;
+    justify-content: center;
+    gap: 30px;
+    padding: 20px 0;
+  }
+  
+  .nav-link {
+    text-decoration: none;
+    color: #333;
+    font-weight: 500;
+  }
+  
+  .nav-link:hover {
+    text-decoration: underline;
+  }
+  
+.destination-section {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 80px 20px;
+    text-align: center;
+  }
+  
+  .destination-section h2 {
+    font-size: 2.5rem;
+    margin-bottom: 10px;
+  }
+  
+  .filters {
+    display: flex;
+    justify-content: center;
+    gap: 15px;
+    margin: 40px 0;
+  }
+  
+  .filters input,
+  .filters select {
+    padding: 12px 14px;
+    font-size: 1rem;
+    border-radius: 8px;
+    border: 1px solid #ddd;
+  }
+  
+  .destination-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 30px;
+  }
+  
+  .destination-card {
+    background: white;
+    border-radius: 16px;
+    box-shadow: 0 6px 15px rgba(0,0,0,0.06);
+    overflow: hidden;
+    text-align: center;
+    padding-bottom: 20px;
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+  }
+  
+  .destination-card:hover {
+    transform: translateY(-10px);
+    box-shadow: 0 20px 35px rgba(0,0,0,0.15);
+  }
+  
+  .destination-card img {
+    width: 100%;
+    height: 180px;
+    object-fit: cover;
+    display: none;
+  }
+  
+  .destination-card h3 {
+    margin: 15px 0 5px;
+  }
+  
+  .destination-card p {
+    margin: 6px 0;
+    color: #555; 
+  }
+  
+  .price {
+    font-weight: bold;
+  }
+  
+  .destination-card button {
+    margin-top: 15px;
+    padding: 10px 24px;
+    border: none;
+    border-radius: 10px;
+    background-color: #56b8e6;
+    color: white;
+    font-size: 1rem;
+    cursor: pointer;
+  }
+  
+  .destination-card button:hover {
+    background-color: #3aa4d6;
+  }
+
+  .page-title {
+    font-size: 2.8rem;
+    text-align: center;
+    margin-bottom: 10px;
+  }
+  
+  .page-subtitle {
+    text-align: center;
+    color: #666;
+    margin-bottom: 40px;
+  }
+
+  /* Container and Card */
+.search-container {
+    display: flex;
+    justify-content: center;
+    padding: 40px 20px;
+    background-color: #fdf8f5; /* Light cream background from image */
+  }
+  
+  .search-card {
+    background: white;
+    width: 100%;
+    max-width: 800px;
+    padding: 40px;
+    border-radius: 20px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.05);
+  }
+  
+  /* Grid Layout */
+  .input-group {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 40px;
+    margin-bottom: 30px;
+    text-align: left;
+  }
+  
+  /* Labels and Icons */
+  .field label {
+    display: block;
+    font-weight: 700;
+    color: #333;
+    margin-bottom: 12px;
+    font-size: 0.95rem;
+  }
+  
+  .icon {
+    color: #56b8e6;
+    margin-right: 5px;
+  }
+  
+  /* Inputs and Selects */
+  .field input[type="text"], 
+  .field select {
+    width: 100%;
+    padding: 15px;
+    border: 1px solid #e0e6ed;
+    border-radius: 12px;
+    font-size: 1rem;
+    outline: none;
+    background-color: #fff;
+  }
+  
+  /* Slider Styling */
+  .slider-container {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+  }
+  
+  .slider {
+    flex-grow: 1;
+    appearance: none;
+    height: 6px;
+    background: #eee;
+    border-radius: 5px;
+    outline: none;
+  }
+  
+  .slider::-webkit-slider-thumb {
+    appearance: none;
+    width: 18px;
+    height: 18px;
+    background: #56b8e6;
+    border-radius: 50%;
+    cursor: pointer;
+  }
+  
+  .slider-value {
+    color: #56b8e6;
+    font-weight: bold;
+    font-size: 1.2rem;
+    min-width: 60px;
+  }
+  
+  .helper-text {
+    display: block;
+    color: #888;
+    margin-top: 8px;
+    font-size: 0.85rem;
+  }
+  
+  /* Action Button */
+  .discover-btn {
+    width: 100%;
+    padding: 18px;
+    background-color: #adddec; /* Light blue from image */
+    color: white;
+    border: none;
+    border-radius: 12px;
+    font-size: 1.1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.3s;
+  }
+  
+  .discover-btn:hover {
+    background-color: #92cedf;
+  }
+  
+  /* Responsive adjustment */
+  @media (max-width: 600px) {
+    .input-group {
+      grid-template-columns: 1fr;
+    }
+  }
+  
+  
