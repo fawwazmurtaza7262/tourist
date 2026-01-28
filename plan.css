@@ -1,0 +1,96 @@
+:root {
+    --primary-blue: #a8dadc;
+    --text-dark: #333;
+    --bg-light: #f8f9fa;
+}
+
+body {
+    font-family: 'Times New Roman', Times, serif; /* Matching your landing page font */
+    margin: 0;
+    background-color: var(--bg-light);
+    color: var(--text-dark);
+}
+
+header {
+    text-align: center;
+    padding: 20px;
+    background: white;
+}
+
+nav a {
+    margin: 0 15px;
+    text-decoration: none;
+    color: black;
+    font-size: 14px;
+}
+
+.container {
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: 30px;
+    max-width: 1100px;
+    margin: 40px auto;
+    padding: 0 20px;
+}
+
+/* Itinerary Section */
+.itinerary-section h2 {
+    border-bottom: 2px solid var(--primary-blue);
+    padding-bottom: 10px;
+}
+
+.day-card {
+    background: white;
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 20px;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+}
+
+.activity-item {
+    display: flex;
+    align-items: center;
+    padding: 10px 0;
+    border-bottom: 1px solid #eee;
+}
+
+.time {
+    font-weight: bold;
+    width: 80px;
+    color: #555;
+}
+
+/* Sidebar Section */
+.sidebar {
+    background: white;
+    padding: 25px;
+    border-radius: 12px;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+    height: fit-content;
+}
+
+.sidebar h3 {
+    margin-top: 0;
+    font-size: 1.2rem;
+}
+
+.budget-summary {
+    background: var(--primary-blue);
+    padding: 15px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+}
+
+.add-btn {
+    background: var(--primary-blue);
+    border: none;
+    padding: 10px 15px;
+    border-radius: 5px;
+    cursor: pointer;
+    margin-top: 10px;
+    width: 100%;
+}
+
+input[type="checkbox"] {
+    margin-right: 10px;
+}
