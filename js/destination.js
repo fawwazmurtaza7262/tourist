@@ -214,5 +214,18 @@ discoverBtn.addEventListener("click", () => {
   resultsSection.scrollIntoView({ behavior: "smooth" });
 });
 
+// --- BUTTON COLOR LOGIC ---
+// Listen for typing in the search box
+cityInput.addEventListener("input", () => {
+    const text = cityInput.value.trim();
+    
+    // If there is text, make button BLUE. If empty, make it GRAY/LIGHT.
+    if (text.length > 0) {
+      discoverBtn.classList.add("active");
+    } else {
+      discoverBtn.classList.remove("active");
+    }
+  });
+
 // Init
 updateBudgetDisplay();

@@ -146,20 +146,34 @@
   .discover-btn {
     width: 100%;
     padding: 18px;
-    background-color: #89CFF0; /* Light Baby Blue */
     color: white;
     border: none;
     border-radius: 12px;
     font-size: 1.1rem;
     font-weight: 600;
-    cursor: pointer;
-    transition: background 0.3s, transform 0.2s;
+    background-color: #adddec; /* The default light blue */
+    background-color: #8FD6E8; /* Lighter blue */
+    transition: background-color 0.3s ease;
+    cursor: not-allowed; /* Shows it's not ready yet */
+
   }
+
+  /* Active State (Text Entered) - Bright Blue */
+.discover-btn.active {
+  background-color: #4FC3F7; /* Bright "Twitter" Blue */
+  cursor: pointer;
+  box-shadow: 0 4px 10px rgba(79, 195, 247, 0.4); /* Nice glow effect */
+}
   
   .discover-btn:hover {
-    background-color: #7abcdb;
+    background-color: #29B6F6; /* Slightly darker on hover */
     transform: translateY(-2px);
   }
+
+  /* The style when the button is "ready" (has text in the input) */
+.discover-btn.ready {
+  background-color: #00b4d8; /* A bright, distinct blue */
+}
   
   /* Responsive Search */
   @media (max-width: 700px) {
