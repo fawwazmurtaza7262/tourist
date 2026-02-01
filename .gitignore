@@ -26,3 +26,5 @@ Icon?
 node_modules/
 dist/
 build/
+
+js/config.js
