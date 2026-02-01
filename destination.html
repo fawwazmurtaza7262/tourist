@@ -5,9 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Destinations | Tourist Planner</title>
   <link rel="stylesheet" href="/css/destination.css" />
-  <script src="/js/destination.js"></script>
-
-</head>
+  <script src="/js/destination.js" defer></script> </head>
 
 <body>
 
@@ -26,70 +24,34 @@
 
   <section class="search-container">
     <div class="search-card">
-
-      <!-- Row 1 -->
       <div class="input-group">
         <div class="field">
-          <label>
-            <span class="icon">📍</span> Destination City
-          </label>
-          <input
-            type="text"
-            id="cityInput"
-            placeholder="Where do you want to go?"
-          />
+          <label><span class="icon">📍</span> Destination City</label>
+          <input type="text" id="cityInput" placeholder="Where do you want to go?" />
         </div>
 
         <div class="field">
-          <label>
-            <span class="icon">📅</span> Duration (Days)
-          </label>
-
+          <label><span class="icon">📅</span> Duration (Days)</label>
           <div class="slider-container">
-            <input
-              type="range"
-              id="daysRange"
-              min="1"
-              max="30"
-              value="3"
-              class="slider"
-            />
+            <input type="range" id="daysRange" min="1" max="30" value="3" class="slider" />
             <span class="slider-value" id="daysValue">3</span>
           </div>
-
           <small class="helper-text" id="daysText">3 days</small>
         </div>
       </div>
 
-      <!-- Row 2 -->
       <div class="input-group">
         <div class="field">
-          <label>
-            <span class="icon">💲</span> Budget Limit
-          </label>
-
+          <label><span class="icon">💲</span> Budget Limit</label>
           <div class="slider-container">
-            <input
-              type="range"
-              id="budgetRange"
-              min="100"
-              max="10000"
-              value="5000"
-              step="100"
-              class="slider"
-            />
+            <input type="range" id="budgetRange" min="100" max="10000" value="5000" step="100" class="slider" />
             <span class="slider-value" id="budgetValue">$5,000</span>
           </div>
-
-          <small class="helper-text" id="budgetText">
-            Total budget: $5,000
-          </small>
+          <small class="helper-text" id="budgetText">Total budget: $5,000</small>
         </div>
 
         <div class="field">
-          <label>
-            <span class="icon">🌐</span> Currency
-          </label>
+          <label><span class="icon">🌐</span> Currency</label>
           <select id="currencySelect">
             <option value="USD">USD - $</option>
             <option value="EUR">EUR - €</option>
@@ -98,11 +60,25 @@
         </div>
       </div>
 
-      <button class="discover-btn" id="discoverBtn">
-        Discover Best Spots
-      </button>
-
+      <button class="discover-btn" id="discoverBtn">Discover Best Spots</button>
     </div>
   </section>
+
+  <section id="resultsSection" class="results-container" style="display: none;">
+    <div class="results-header">
+      <h2 id="resultsTitle">Best Spots in ...</h2>
+      <p id="resultsCount">0 attractions within your budget</p>
+    </div>
+  
+    <div class="stats-row">
+      <div class="stat-card">Duration: <strong id="statDays">0 days</strong></div>
+      <div class="stat-card">Budget: <strong id="statBudget">$0</strong></div>
+      <div class="stat-card">Currency: <strong id="statCurrency">USD</strong></div>
+    </div>
+  
+    <div class="spots-grid" id="spotsGrid">
+      </div>
+  </section>
+
 </body>
 </html>

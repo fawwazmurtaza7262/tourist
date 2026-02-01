@@ -1,8 +1,20 @@
-.nav {
+/* =========================================
+   1. GLOBAL & NAVIGATION
+   ========================================= */
+   body {
+    font-family: sans-serif;
+    margin: 0;
+    padding: 0;
+    background-color: #f8f9fa;
+  }
+  
+  .nav {
     display: flex;
     justify-content: center;
     gap: 30px;
     padding: 20px 0;
+    background: white;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.05);
   }
   
   .nav-link {
@@ -15,121 +27,35 @@
     text-decoration: underline;
   }
   
-.destination-section {
-    max-width: 1200px;
-    margin: 0 auto;
-    padding: 80px 20px;
-    text-align: center;
-  }
-  
-  .destination-section h2 {
-    font-size: 2.5rem;
-    margin-bottom: 10px;
-  }
-  
-  .filters {
-    display: flex;
-    justify-content: center;
-    gap: 15px;
-    margin: 40px 0;
-  }
-  
-  .filters input,
-  .filters select {
-    padding: 12px 14px;
-    font-size: 1rem;
-    border-radius: 8px;
-    border: 1px solid #ddd;
-  }
-  
-  .destination-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-    gap: 30px;
-  }
-  
-  .destination-card {
-    border-radius: 16px;
-    box-shadow: 0 6px 15px rgba(0,0,0,0.06);
-    overflow: hidden;
-    text-align: center;
-    padding-bottom: 20px;
-    transition: transform 0.3s ease, box-shadow 0.3s ease;
-  }
-  
-  .destination-card:hover {
-    transform: translateY(-10px);
-    box-shadow: 0 20px 35px rgba(0,0,0,0.15);
-  }
-  
-  .destination-card img {
-    width: 100%;
-    height: 180px;
-    object-fit: cover;
-    display: none;
-  }
-  
-  .destination-card h3 {
-    margin: 15px 0 5px;
-  }
-  
-  .destination-card p {
-    margin: 6px 0;
-    color: white; 
-  }
-  
-  .price {
-    font-weight: bold;
-  }
-  
-  .destination-card button {
-    margin-top: 15px;
-    padding: 10px 24px;
-    border: none;
-    border-radius: 10px;
-    background-color: #56b8e6;
-    color: white;
-    font-size: 1rem;
-    cursor: pointer;
-  }
-  
-  .destination-card button:hover {
-    background-color: #3aa4d6;
-  }
-
+  /* =========================================
+     2. PAGE HEADER
+     ========================================= */
   .page-title {
-    font-size: 2.8rem;
     text-align: center;
-    margin-bottom: 10px;
-    background: linear-gradient(
-          90deg,
-          #00c6ff,
-          #f25f3a
-        );
-        color: white;
-  }
-
-  .page-title p{
+    padding: 40px 20px;
+    background: linear-gradient(90deg, #00c6ff, #f25f3a);
     color: white;
+    margin-bottom: 0; /* Connected to search container */
   }
   
-  .page-subtitle {
-    text-align: center;
-    color: #666;
-    margin-bottom: 40px;
+  .page-title h2 {
+    font-size: 2.8rem;
+    margin: 0 0 10px 0;
   }
-
-  /* Container and Card */
-.search-container {
+  
+  .page-title p {
+    color: rgba(255, 255, 255, 0.9);
+    font-size: 1.1rem;
+  }
+  
+  /* =========================================
+     3. SEARCH CONTAINER (The Input Box)
+     ========================================= */
+  .search-container {
     display: flex;
     justify-content: center;
-    padding: 40px 20px;
-    background: linear-gradient(
-          90deg,
-          #00c6ff,
-          #f25f3a
-        );
-        color: white;
+    padding: 0 20px 60px 20px; /* Padding bottom to separate from results */
+    background: linear-gradient(90deg, #00c6ff, #f25f3a); /* Continues header bg */
   }
   
   .search-card {
@@ -138,10 +64,11 @@
     max-width: 800px;
     padding: 40px;
     border-radius: 20px;
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.05);
+    box-shadow: 0 15px 35px rgba(0, 0, 0, 0.1);
+    margin-top: -20px; /* Slight overlap effect */
   }
   
-  /* Grid Layout */
+  /* Grid Layout for Inputs */
   .input-group {
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -150,7 +77,6 @@
     text-align: left;
   }
   
-  /* Labels and Icons */
   .field label {
     display: block;
     font-weight: 700;
@@ -160,11 +86,10 @@
   }
   
   .icon {
-    color: #56b8e6;
     margin-right: 5px;
   }
   
-  /* Inputs and Selects */
+  /* Input Fields */
   .field input[type="text"], 
   .field select {
     width: 100%;
@@ -174,6 +99,7 @@
     font-size: 1rem;
     outline: none;
     background-color: #fff;
+    box-sizing: border-box; /* Ensures padding doesn't break width */
   }
   
   /* Slider Styling */
@@ -204,8 +130,9 @@
   .slider-value {
     color: #56b8e6;
     font-weight: bold;
-    font-size: 1.2rem;
-    min-width: 60px;
+    font-size: 1.1rem;
+    min-width: 50px;
+    text-align: right;
   }
   
   .helper-text {
@@ -215,31 +142,178 @@
     font-size: 0.85rem;
   }
   
-  /* Action Button */
+  /* Discover Button */
   .discover-btn {
     width: 100%;
     padding: 18px;
-    background-color: #adddec; /* Light blue from image */
+    background-color: #89CFF0; /* Light Baby Blue */
     color: white;
     border: none;
     border-radius: 12px;
     font-size: 1.1rem;
     font-weight: 600;
     cursor: pointer;
-    transition: background 0.3s;
+    transition: background 0.3s, transform 0.2s;
   }
   
   .discover-btn:hover {
-    background-color: #92cedf;
+    background-color: #7abcdb;
+    transform: translateY(-2px);
   }
   
-  /* Responsive adjustment */
-  @media (max-width: 600px) {
+  /* Responsive Search */
+  @media (max-width: 700px) {
     .input-group {
       grid-template-columns: 1fr;
+      gap: 20px;
     }
   }
-
   
+  /* =========================================
+     4. RESULTS SECTION (The New Part)
+     ========================================= */
+  .results-container {
+    max-width: 1000px;
+    margin: 0 auto;
+    padding: 60px 20px;
+  }
   
+  .results-header h2 {
+    font-size: 2rem;
+    margin-bottom: 5px;
+    color: #2c3e50;
+  }
   
+  .results-header p {
+    color: #7f8c8d;
+    margin-top: 0;
+  }
+  
+  /* Stats Row (Duration, Budget, Currency boxes) */
+  .stats-row {
+    display: flex;
+    gap: 15px;
+    margin: 25px 0 40px 0;
+    flex-wrap: wrap;
+  }
+  
+  .stat-card {
+    background: #e9ecef; /* Light gray background like screenshot */
+    padding: 12px 20px;
+    border-radius: 8px;
+    font-size: 0.85rem;
+    color: #7f8c8d;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    display: flex;
+    align-items: center;
+  }
+  
+  .stat-card strong {
+    color: #2c3e50;
+    font-size: 1rem;
+    margin-left: 8px;
+  }
+  
+  /* The Grid for Cards */
+  .spots-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 30px;
+  }
+  
+  /* Individual Card Design */
+  .spot-card {
+    background: white;
+    border-radius: 16px;
+    overflow: hidden;
+    border: 1px solid #eee;
+    box-shadow: 0 10px 20px rgba(0,0,0,0.05);
+    display: flex;
+    flex-direction: column;
+    transition: transform 0.3s ease;
+  }
+  
+  .spot-card:hover {
+    transform: translateY(-5px);
+  }
+  
+  /* Card Gradient Header with Icon */
+  .card-header {
+    background: linear-gradient(to bottom, #e3f2fd, #ffffff);
+    padding: 30px 0;
+    text-align: center;
+    border-bottom: 1px solid #f0f0f0;
+  }
+  
+  .card-icon {
+    font-size: 3rem;
+    display: block;
+  }
+  
+  /* Card Body */
+  .card-body {
+    padding: 20px;
+    flex-grow: 1;
+    display: flex;
+    flex-direction: column;
+  }
+  
+  .card-body h3 {
+    margin: 0 0 5px 0;
+    font-size: 1.2rem;
+    color: #333;
+  }
+  
+  .rating {
+    font-size: 0.9rem;
+    color: #f39c12; /* Star color */
+    font-weight: bold;
+    margin-bottom: 10px;
+  }
+  
+  .card-body p {
+    color: #666;
+    font-size: 0.95rem;
+    line-height: 1.5;
+    margin-bottom: 20px;
+    flex-grow: 1;
+  }
+  
+  /* Price and Button Area */
+  .price-box {
+    background: #f8f9fa;
+    padding: 12px;
+    border-radius: 8px;
+    margin-bottom: 15px;
+    display: flex;
+    flex-direction: column;
+  }
+  
+  .price-box span {
+    font-size: 0.75rem;
+    color: #999;
+    font-weight: bold;
+    letter-spacing: 1px;
+  }
+  
+  .price-box strong {
+    font-size: 1.4rem;
+    margin-top: 2px;
+  }
+  
+  .learn-btn {
+    width: 100%;
+    padding: 12px;
+    background-color: #00b4d8; /* Bright Blue */
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: background 0.2s;
+  }
+  
+  .learn-btn:hover {
+    background-color: #0096c7;
+  }
