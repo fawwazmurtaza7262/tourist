@@ -5,6 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Plan Trip - Tourist Planner</title>
     <link rel="stylesheet" href="/css/plan.css">
+    
+    <script src="/js/config.js"></script>
+    <script src="/js/plan.js" defer></script>
 </head>
 <body>
     <header>
@@ -12,37 +15,25 @@
         <nav>
             <a href="main.html">Home</a>
             <a href="destination.html">Destinations</a>
-            <a href="/css/plan.css"><strong>Plan Trip</strong></a>
+            <a href="plan.html" class="active"><strong>Plan Trip</strong></a>
         </nav>
     </header>
 
     <div class="container">
         <div class="itinerary-section">
-            <h2>Your Itinerary</h2>
+            
+            <div class="section-header">
+                <h2>Your Itinerary</h2>
+                <button id="clearAllBtn" class="clear-btn">Clear All</button>
+            </div>
             
             <div class="day-card">
-                <h3>Day 1: Arrival & Exploring</h3>
-                <div class="activity-item">
-                    <span class="time">09:00 AM</span>
-                    <span>Check-in at Hotel Central</span>
-                </div>
-                <div class="activity-item">
-                    <span class="time">12:30 PM</span>
-                    <span>Lunch at local bistro (Saved from Destinations)</span>
-                </div>
-                <div class="activity-item">
-                    <span class="time">03:00 PM</span>
-                    <span>City Walking Tour</span>
-                </div>
+                <h3>Day 1</h3>
                 <button class="add-btn">+ Add Activity</button>
             </div>
 
             <div class="day-card">
-                <h3>Day 2: Museum Day</h3>
-                <div class="activity-item">
-                    <span class="time">10:00 AM</span>
-                    <span>Main Art Gallery</span>
-                </div>
+                <h3>Day 2</h3>
                 <button class="add-btn">+ Add Activity</button>
             </div>
         </div>
@@ -50,7 +41,7 @@
         <div class="sidebar">
             <div class="budget-summary">
                 <strong>Budget Tracker</strong><br>
-                Remaining: $3,450 / $5,000
+                Remaining: $5,000 / $5,000
             </div>
 
             <h3>Packing Checklist</h3>
@@ -62,10 +53,7 @@
             <hr>
             
             <h3>Flight Info</h3>
-            <p style="font-size: 0.9rem; color: #666;">
-                Flight BA2490<br>
-                Departs: 10:30 AM (Terminal 5)
-            </p>
+            <textarea placeholder="Enter flight details here..." style="width: 100%; height: 60px; border-color: #ddd; border-radius: 5px; padding: 5px;"></textarea>
         </div>
     </div>
 

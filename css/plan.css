@@ -94,3 +94,41 @@ nav a {
 input[type="checkbox"] {
     margin-right: 10px;
 }
+
+/* Header alignment */
+.section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    border-bottom: 2px solid #eee; /* Adds a nice separator line */
+    padding-bottom: 10px;
+}
+
+.section-header h2 {
+    margin: 0;
+    color: #2c3e50;
+}
+
+/* Clear Button Styling */
+.clear-btn {
+    background-color: #ff6b6b;
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: bold;
+    font-size: 0.9rem;
+    transition: background 0.3s;
+}
+
+.clear-btn:hover {
+    background-color: #ff5252;
+}
+
+/* Sidebar Textarea */
+textarea {
+    font-family: inherit;
+    resize: vertical;
+}
