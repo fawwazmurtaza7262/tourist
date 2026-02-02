@@ -25,11 +25,12 @@ nav a {
 }
 
 .container {
-    display: grid;
-    grid-template-columns: 2fr 1fr;
-    gap: 30px;
-    max-width: 1100px;
-    margin: 40px auto;
+    display: flex;             /* This is the magic line that puts them side-by-side */
+    justify-content: space-between; /* Pushes them apart */
+    align-items: flex-start;   /* Aligns them to the top */
+    gap: 40px;                 /* Adds space between the columns */
+    max-width: 1200px;         /* Keeps the page from getting too wide */
+    margin: 40px auto;         /* Centers the whole page */
     padding: 0 20px;
 }
 
@@ -37,6 +38,25 @@ nav a {
 .itinerary-section h2 {
     border-bottom: 2px solid var(--primary-blue);
     padding-bottom: 10px;
+}
+
+.itinerary-section {
+    flex: 1;                   /* Tells the itinerary to take up all extra space */
+    min-width: 0;              /* Prevents layout bugs */
+}
+
+.sidebar {
+    width: 320px;              /* Fixes the width of the right column */
+    flex-shrink: 0;            /* Stops it from getting squished */
+    background: #ffffff;
+    padding: 25px;
+    border-radius: 12px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.05); /* Adds a nice shadow */
+    border: 1px solid #eee;
+    
+    /* Optional: Makes it stick to the top as you scroll */
+    position: sticky;
+    top: 20px;
 }
 
 .day-card {
@@ -131,4 +151,44 @@ input[type="checkbox"] {
 textarea {
     font-family: inherit;
     resize: vertical;
+}
+
+/* Add Day Button */
+.add-day-btn {
+    width: 100%;
+    padding: 15px;
+    background-color: transparent;
+    border: 2px dashed #ccc;
+    color: #888;
+    font-size: 1.1rem;
+    font-weight: bold;
+    border-radius: 10px;
+    cursor: pointer;
+    margin-top: 20px;
+    transition: all 0.3s;
+}
+
+.add-day-btn:hover {
+    border-color: #00b4d8;
+    color: #00b4d8;
+    background-color: #f0f9ff;
+}
+
+/* Style for the day header row */
+.day-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+/* --- MOBILE RESPONSIVE --- */
+/* If on a phone, go back to stacking them */
+@media (max-width: 800px) {
+    .container {
+        flex-direction: column;
+    }
+    .sidebar {
+        width: 100%;
+        margin-top: 30px;
+    }
 }
