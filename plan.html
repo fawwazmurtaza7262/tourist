@@ -11,42 +11,58 @@
 </head>
 <body>
     <header>
-        <h1>Tourist Planner</h1>
-        <nav>
-            <a href="main.html">Home</a>
-            <a href="destination.html">Destinations</a>
-            <a href="plan.html" class="active"><strong>Plan Trip</strong></a>
-        </nav>
-    </header>
+    <h1>Tourist Planner</h1>
+    <nav>
+        <a href="main.html">Home</a>
+        <a href="destination.html">Destinations</a>
+        <a href="plan.html" class="active"><strong>Plan Trip</strong></a>
+    </nav>
+</header>
 
-    <div class="container">
-        
-        <div class="itinerary-section">
-            <div class="section-header">
-                <h2>Your Itinerary</h2>
-                <button id="clearAllBtn" class="clear-btn">Clear All</button>
-            </div>
-            
-            <div id="daysContainer">
-                </div>
-    
-            <button id="addDayBtn" class="add-day-btn">+ Add Day</button>
-        </div> <div class="sidebar">
-            <div class="budget-summary">
-                <strong>Budget Tracker</strong><br>
-                Remaining: $5,000 / $5,000
-            </div>
+<div class="container">
 
-            <h3>Packing Checklist</h3>
-            <div><input type="checkbox"> Passport</div>
-            <div><input type="checkbox"> Travel Insurance</div>
-            <div><input type="checkbox"> Camera Gear</div>
-            <div><input type="checkbox"> Universal Adapter</div>
-            
-            <hr>
-            
-            <h3>Flight Info</h3>
-            <textarea placeholder="Enter flight details here..." style="width: 100%; height: 60px; border-color: #ddd; border-radius: 5px; padding: 5px;"></textarea>
-        </div> 
-    </div> 
-</body>
+    <div class="itinerary-section">
+        <div class="section-header">
+            <h2>Your Itinerary</h2>
+            <button id="clearAllBtn" class="clear-btn">Clear All</button>
+        </div>
+
+        <div id="daysContainer"></div>
+
+        <button id="addDayBtn" class="add-day-btn">+ Add Day</button>
+    </div>
+
+    <div class="sidebar">
+        <div class="budget-summary">
+            <strong>Budget Tracker</strong><br>
+            Remaining: $5,000 / $5,000
+        </div>
+
+        <h3>Packing Checklist</h3>
+        <div><label><input type="checkbox"> Passport</label></div>
+        <div><label><input type="checkbox"> Travel Insurance</label></div>
+        <div><label><input type="checkbox"> Camera Gear</label></div>
+        <div><label><input type="checkbox"> Universal Adapter</label></div>
+
+        <hr>
+
+        <h3>Flight Info</h3>
+        <textarea placeholder="Enter flight details here..." style="width:100%; height:60px; border-color:#ddd; border-radius:5px; padding:5px; box-sizing:border-box;"></textarea>
+    </div>
+
+</div>
+
+<!-- Add Activity Modal -->
+<div class="modal-overlay" id="activityModal">
+    <div class="modal">
+        <h3>Add Activity</h3>
+        <label for="activityTime">Time</label>
+        <input type="text" id="activityTime" placeholder="e.g. 10:00 AM" />
+        <label for="activityName">Activity</label>
+        <input type="text" id="activityName" placeholder="e.g. Visit Old Jaffa" />
+        <div class="modal-actions">
+            <button class="modal-cancel" id="modalCancel">Cancel</button>
+            <button class="modal-confirm" id="modalConfirm">Add</button>
+        </div>
+    </div>
+</div>

@@ -97,9 +97,10 @@ const updateBudgetDisplay = () => {
   budgetText.textContent = `Total budget: ${symbol}${amount}`;
 };
 
+// REPLACE your existing renderCards function with this:
 const renderCards = (spots) => {
   spotsGrid.innerHTML = ""; 
-  
+
   if (!spots || spots.length === 0) {
     spotsGrid.innerHTML = `<p>No spots found. Try a different city.</p>`;
     return;
@@ -110,6 +111,8 @@ const renderCards = (spots) => {
     
     const card = document.createElement("div");
     card.className = "spot-card";
+    
+    // We use data-attributes to store the info we want to save
     card.innerHTML = `
       <div class="card-header"><span class="card-icon">${spot.image}</span></div>
       <div class="card-body">
@@ -120,12 +123,44 @@ const renderCards = (spots) => {
            <span>ENTRY PRICE</span>
            <strong style="color:${spot.price === 0 ? '#2ecc71' : '#3498db'}">${priceDisplay}</strong>
         </div>
-        <button class="learn-btn">Learn More</button>
+        
+        <button class="learn-btn" 
+          onclick="addToItinerary(this)" 
+          data-name="${spot.name}" 
+          data-price="${priceDisplay}">
+          + Add to Itinerary
+        </button>
       </div>
     `;
     spotsGrid.appendChild(card);
   });
 };
+
+// --- NEW FUNCTION: Save to Local Storage ---
+function addToItinerary(button) {
+  // 1. Get data from the button's data attributes
+  const spotName = button.getAttribute("data-name");
+  const spotPrice = button.getAttribute("data-price");
+
+  // 2. Create an object for the activity
+  const newActivity = {
+    time: "TBD", // Placeholder time
+    name: spotName,
+    price: spotPrice
+  };
+
+  // 3. Get existing trip data (or start empty array)
+  const currentTrip = JSON.parse(localStorage.getItem("myTrip")) || [];
+
+  // 4. Add new item and save back to storage
+  currentTrip.push(newActivity);
+  localStorage.setItem("myTrip", JSON.stringify(currentTrip));
+
+  // 5. Visual Feedback (Change button to green)
+  button.textContent = "Added! ✓";
+  button.style.backgroundColor = "#2ecc71";
+  button.disabled = true; // Prevent double clicking
+}
 
 // --- 4. GOOGLE GEMINI AI FUNCTION ---
 const fetchWithAI = async (city) => {

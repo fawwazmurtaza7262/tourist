@@ -5,7 +5,7 @@
 }
 
 body {
-    font-family: 'Times New Roman', Times, serif; /* Matching your landing page font */
+    font-family: 'Times New Roman', Times, serif;
     margin: 0;
     background-color: var(--bg-light);
     color: var(--text-dark);
@@ -24,69 +24,40 @@ nav a {
     font-size: 14px;
 }
 
+nav a.active {
+    border-bottom: 2px solid var(--primary-blue);
+}
+
 .container {
-    display: flex;             /* This is the magic line that puts them side-by-side */
-    justify-content: space-between; /* Pushes them apart */
-    align-items: flex-start;   /* Aligns them to the top */
-    gap: 40px;                 /* Adds space between the columns */
-    max-width: 1200px;         /* Keeps the page from getting too wide */
-    margin: 40px auto;         /* Centers the whole page */
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 40px;
+    max-width: 1200px;
+    margin: 40px auto;
     padding: 0 20px;
 }
 
-/* Itinerary Section */
+.itinerary-section {
+    flex: 1;
+    min-width: 0;
+}
+
 .itinerary-section h2 {
     border-bottom: 2px solid var(--primary-blue);
     padding-bottom: 10px;
 }
 
-.itinerary-section {
-    flex: 1;                   /* Tells the itinerary to take up all extra space */
-    min-width: 0;              /* Prevents layout bugs */
-}
-
 .sidebar {
-    width: 320px;              /* Fixes the width of the right column */
-    flex-shrink: 0;            /* Stops it from getting squished */
+    width: 320px;
+    flex-shrink: 0;
     background: #ffffff;
     padding: 25px;
     border-radius: 12px;
-    box-shadow: 0 4px 15px rgba(0,0,0,0.05); /* Adds a nice shadow */
+    box-shadow: 0 4px 15px rgba(0,0,0,0.05);
     border: 1px solid #eee;
-    
-    /* Optional: Makes it stick to the top as you scroll */
     position: sticky;
     top: 20px;
-}
-
-.day-card {
-    background: white;
-    border-radius: 12px;
-    padding: 20px;
-    margin-bottom: 20px;
-    box-shadow: 0 4px 6px rgba(0,0,0,0.05);
-}
-
-.activity-item {
-    display: flex;
-    align-items: center;
-    padding: 10px 0;
-    border-bottom: 1px solid #eee;
-}
-
-.time {
-    font-weight: bold;
-    width: 80px;
-    color: #555;
-}
-
-/* Sidebar Section */
-.sidebar {
-    background: white;
-    padding: 25px;
-    border-radius: 12px;
-    box-shadow: 0 4px 6px rgba(0,0,0,0.05);
-    height: fit-content;
 }
 
 .sidebar h3 {
@@ -101,6 +72,85 @@ nav a {
     margin-bottom: 20px;
 }
 
+.day-card {
+    background: white;
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 20px;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+}
+
+.day-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+}
+
+.day-header h3 {
+    margin: 0;
+    font-size: 1.1rem;
+    color: #2c3e50;
+}
+
+.delete-day-btn {
+    background: none;
+    border: none;
+    color: #ccc;
+    font-size: 1rem;
+    cursor: pointer;
+    padding: 4px 8px;
+    border-radius: 4px;
+    transition: color 0.2s, background 0.2s;
+}
+
+.delete-day-btn:hover {
+    color: #ff5252;
+    background: #fff0f0;
+}
+
+.activity-item {
+    display: flex;
+    align-items: center;
+    padding: 10px 0;
+    border-bottom: 1px solid #eee;
+    gap: 10px;
+}
+
+.time {
+    font-weight: bold;
+    width: 80px;
+    flex-shrink: 0;
+    color: #555;
+    font-size: 0.85rem;
+}
+
+.time.saved-tag {
+    color: #00b4d8;
+}
+
+.activity-text {
+    flex: 1;
+    font-size: 0.95rem;
+}
+
+.delete-btn {
+    background: none;
+    border: none;
+    color: #ccc;
+    font-size: 0.9rem;
+    cursor: pointer;
+    padding: 2px 6px;
+    border-radius: 4px;
+    transition: color 0.2s, background 0.2s;
+    flex-shrink: 0;
+}
+
+.delete-btn:hover {
+    color: #ff5252;
+    background: #fff0f0;
+}
+
 .add-btn {
     background: var(--primary-blue);
     border: none;
@@ -109,28 +159,30 @@ nav a {
     cursor: pointer;
     margin-top: 10px;
     width: 100%;
+    font-family: inherit;
+    font-size: 0.9rem;
+    transition: background 0.2s;
 }
 
-input[type="checkbox"] {
-    margin-right: 10px;
+.add-btn:hover {
+    background: #8ecfd1;
 }
 
-/* Header alignment */
 .section-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
     margin-bottom: 20px;
-    border-bottom: 2px solid #eee; /* Adds a nice separator line */
+    border-bottom: 2px solid #eee;
     padding-bottom: 10px;
 }
 
 .section-header h2 {
     margin: 0;
     color: #2c3e50;
+    border-bottom: none;
 }
 
-/* Clear Button Styling */
 .clear-btn {
     background-color: #ff6b6b;
     color: white;
@@ -140,6 +192,7 @@ input[type="checkbox"] {
     cursor: pointer;
     font-weight: bold;
     font-size: 0.9rem;
+    font-family: inherit;
     transition: background 0.3s;
 }
 
@@ -147,13 +200,6 @@ input[type="checkbox"] {
     background-color: #ff5252;
 }
 
-/* Sidebar Textarea */
-textarea {
-    font-family: inherit;
-    resize: vertical;
-}
-
-/* Add Day Button */
 .add-day-btn {
     width: 100%;
     padding: 15px;
@@ -162,6 +208,7 @@ textarea {
     color: #888;
     font-size: 1.1rem;
     font-weight: bold;
+    font-family: inherit;
     border-radius: 10px;
     cursor: pointer;
     margin-top: 20px;
@@ -174,21 +221,157 @@ textarea {
     background-color: #f0f9ff;
 }
 
-/* Style for the day header row */
-.day-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
+input[type="checkbox"] {
+    margin-right: 10px;
 }
 
-/* --- MOBILE RESPONSIVE --- */
-/* If on a phone, go back to stacking them */
+textarea {
+    font-family: inherit;
+    resize: vertical;
+}
+
+/* Empty state */
+.empty-state {
+    text-align: center;
+    color: #aaa;
+    padding: 30px 0 10px;
+    font-style: italic;
+    font-size: 0.95rem;
+}
+
+/* Modal overlay */
+.modal-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.35);
+    z-index: 1000;
+    align-items: center;
+    justify-content: center;
+}
+
+.modal-overlay.open {
+    display: flex;
+}
+
+.modal {
+    background: white;
+    border-radius: 14px;
+    padding: 30px;
+    width: 360px;
+    max-width: 90vw;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.15);
+}
+
+.modal h3 {
+    margin: 0 0 20px;
+    font-size: 1.2rem;
+    color: #2c3e50;
+}
+
+.modal label {
+    display: block;
+    font-size: 0.85rem;
+    font-weight: bold;
+    color: #555;
+    margin-bottom: 5px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.modal input {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid #ddd;
+    border-radius: 7px;
+    font-family: inherit;
+    font-size: 0.95rem;
+    margin-bottom: 15px;
+    box-sizing: border-box;
+    transition: border-color 0.2s;
+}
+
+.modal input:focus {
+    outline: none;
+    border-color: #00b4d8;
+}
+
+.modal-actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 5px;
+}
+
+.modal-confirm {
+    flex: 1;
+    background: #00b4d8;
+    color: white;
+    border: none;
+    padding: 11px;
+    border-radius: 7px;
+    font-family: inherit;
+    font-size: 0.95rem;
+    font-weight: bold;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.modal-confirm:hover {
+    background: #0096b4;
+}
+
+.modal-cancel {
+    flex: 1;
+    background: #f1f5f9;
+    color: #555;
+    border: none;
+    padding: 11px;
+    border-radius: 7px;
+    font-family: inherit;
+    font-size: 0.95rem;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.modal-cancel:hover {
+    background: #e2e8f0;
+}
+
+/* Toast */
+.toast {
+    position: fixed;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%) translateY(20px);
+    background: #2c3e50;
+    color: white;
+    padding: 12px 24px;
+    border-radius: 8px;
+    font-size: 0.9rem;
+    font-weight: bold;
+    opacity: 0;
+    transition: all 0.3s ease;
+    z-index: 2000;
+    pointer-events: none;
+}
+
+.toast.show {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+}
+
+.toast.success { background: #10b981; }
+.toast.warning { background: #f59e0b; }
+.toast.error   { background: #ef4444; }
+
 @media (max-width: 800px) {
     .container {
         flex-direction: column;
     }
     .sidebar {
         width: 100%;
+        box-sizing: border-box;
         margin-top: 30px;
+        position: static;
     }
 }

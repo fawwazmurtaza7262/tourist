@@ -1,123 +1,228 @@
-console.log("Plan JS loaded");
+function getDays() {
+  return JSON.parse(localStorage.getItem("tripDays")) || [{ label: "Day 1", activities: [] }];
+}
 
-// Track how many days we have
-let dayCount = 0;
+function saveDays(days) {
+  localStorage.setItem("tripDays", JSON.stringify(days));
+}
 
-document.addEventListener("DOMContentLoaded", () => {
-  const addDayBtn = document.getElementById("addDayBtn");
-  
-  // 1. Initialize: Create Day 1 automatically so the page isn't empty
-  createDay(); 
+// ─────────────────────────────────────────
+// TOAST
+// ─────────────────────────────────────────
 
-  // 2. Load any saved items from the Destinations page
-  loadSavedActivities();
+function showToast(message, type = "success") {
+  const toast = document.getElementById("toast");
+  toast.textContent = message;
+  toast.className = `toast ${type} show`;
+  clearTimeout(toast._timer);
+  toast._timer = setTimeout(() => {
+      toast.className = "toast";
+  }, 2500);
+}
 
-  // 3. Setup the "Add Day" button listener
-  addDayBtn.addEventListener("click", () => {
-    createDay();
+// ─────────────────────────────────────────
+// RENDER
+// ─────────────────────────────────────────
+
+function render() {
+  const days = getDays();
+  const container = document.getElementById("daysContainer");
+  container.innerHTML = "";
+
+  if (days.length === 0) {
+      container.innerHTML = `<p class="empty-state">No days yet. Click "+ Add Day" to get started.</p>`;
+      return;
+  }
+
+  days.forEach((day, dayIndex) => {
+      const card = document.createElement("div");
+      card.className = "day-card";
+
+      // Day header with delete button
+      const header = document.createElement("div");
+      header.className = "day-header";
+      header.innerHTML = `
+          <h3>${day.label}</h3>
+          <button class="delete-day-btn" title="Remove this day" data-day="${dayIndex}">✕ Remove day</button>
+      `;
+      card.appendChild(header);
+
+      // Activities
+      if (day.activities.length === 0) {
+          const empty = document.createElement("p");
+          empty.className = "empty-state";
+          empty.style.padding = "10px 0 5px";
+          empty.textContent = "No activities yet.";
+          card.appendChild(empty);
+      } else {
+          day.activities.forEach((act, actIndex) => {
+              const row = document.createElement("div");
+              row.className = "activity-item";
+              const isSaved = act.time === "Saved";
+              row.innerHTML = `
+                  <span class="time ${isSaved ? "saved-tag" : ""}">${act.time}</span>
+                  <span class="activity-text">${act.text}</span>
+                  <button class="delete-btn" data-day="${dayIndex}" data-act="${actIndex}" title="Remove">✕</button>
+              `;
+              card.appendChild(row);
+          });
+      }
+
+      // Add activity button
+      const addBtn = document.createElement("button");
+      addBtn.className = "add-btn";
+      addBtn.textContent = "+ Add Activity";
+      addBtn.dataset.day = dayIndex;
+      card.appendChild(addBtn);
+
+      container.appendChild(card);
   });
 
-  // 4. Setup Checklist & Clear buttons (same as before)
-  setupChecklist();
-  setupClearButton();
+  // Wire up delete activity buttons
+  container.querySelectorAll(".delete-btn").forEach(btn => {
+      btn.addEventListener("click", () => {
+          const days = getDays();
+          days[btn.dataset.day].activities.splice(Number(btn.dataset.act), 1);
+          saveDays(days);
+          render();
+      });
+  });
+
+  // Wire up delete day buttons
+  container.querySelectorAll(".delete-day-btn").forEach(btn => {
+      btn.addEventListener("click", () => {
+          if (!confirm(`Remove ${getDays()[btn.dataset.day].label}?`)) return;
+          const days = getDays();
+          days.splice(Number(btn.dataset.day), 1);
+          saveDays(days);
+          render();
+          showToast("Day removed", "warning");
+      });
+  });
+
+  // Wire up add activity buttons
+  container.querySelectorAll(".add-btn").forEach(btn => {
+      btn.addEventListener("click", () => openModal(Number(btn.dataset.day)));
+  });
+}
+
+// ─────────────────────────────────────────
+// MODAL
+// ─────────────────────────────────────────
+
+let _activeDayIndex = null;
+
+function openModal(dayIndex) {
+  _activeDayIndex = dayIndex;
+  document.getElementById("activityTime").value = "";
+  document.getElementById("activityName").value = "";
+  document.getElementById("activityModal").classList.add("open");
+  document.getElementById("activityTime").focus();
+}
+
+function closeModal() {
+  document.getElementById("activityModal").classList.remove("open");
+  _activeDayIndex = null;
+}
+
+document.getElementById("modalCancel").addEventListener("click", closeModal);
+
+document.getElementById("activityModal").addEventListener("click", (e) => {
+  if (e.target === e.currentTarget) closeModal();
 });
 
-// --- CORE FUNCTION: Create a New Day ---
-function createDay() {
-  dayCount++; // Increment day counter (Day 1, Day 2, etc.)
-  
-  const daysContainer = document.getElementById("daysContainer");
-  
-  // Create the Card HTML
-  const dayCard = document.createElement("div");
-  dayCard.className = "day-card";
-  dayCard.innerHTML = `
-    <div class="day-header">
-        <h3>Day ${dayCount}</h3>
-        <button class="delete-day-btn" style="background:none; border:none; cursor:pointer;">🗑️</button>
-    </div>
-    <div class="activities-list"></div> <button class="add-btn">+ Add Activity</button>
-  `;
+document.getElementById("modalConfirm").addEventListener("click", () => {
+  const time = document.getElementById("activityTime").value.trim();
+  const text = document.getElementById("activityName").value.trim();
 
-  daysContainer.appendChild(dayCard);
+  if (!time || !text) {
+      showToast("Please fill in both fields", "error");
+      return;
+  }
 
-  // Attach event listener to the NEW "+ Add Activity" button immediately
-  const addActivityBtn = dayCard.querySelector(".add-btn");
-  addActivityBtn.addEventListener("click", handleAddActivity);
-  
-  // Attach event listener to delete the day
-  const deleteDayBtn = dayCard.querySelector(".delete-day-btn");
-  deleteDayBtn.addEventListener("click", () => {
-     if(confirm(`Delete Day ${dayCount}?`)) {
-         dayCard.remove();
-         // Optional: You could re-number the remaining days here if you wanted
-     }
-  });
-}
+  const days = getDays();
+  days[_activeDayIndex].activities.push({ time, text });
+  saveDays(days);
+  closeModal();
+  render();
+  showToast("Activity added ✓");
+});
 
-// --- HELPER: Handle Adding an Activity ---
-function handleAddActivity(e) {
-  const time = prompt("What time is this activity? (e.g., 10:00 AM)");
-  if (!time) return; 
+// Allow Enter key to confirm
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Enter" && document.getElementById("activityModal").classList.contains("open")) {
+      document.getElementById("modalConfirm").click();
+  }
+  if (e.key === "Escape") closeModal();
+});
 
-  const text = prompt("What is the activity?");
-  if (!text) return; 
+// ─────────────────────────────────────────
+// ADD DAY
+// ─────────────────────────────────────────
 
-  // Create the activity row
-  const newRow = document.createElement("div");
-  newRow.className = "activity-item";
-  newRow.innerHTML = `
-    <span class="time">${time}</span>
-    <span>${text}</span>
-  `;
+document.getElementById("addDayBtn").addEventListener("click", () => {
+  const days = getDays();
+  days.push({ label: `Day ${days.length + 1}`, activities: [] });
+  saveDays(days);
+  render();
+  showToast(`Day ${days.length} added ✓`);
+});
 
-  // Insert it into the .activities-list container (before the Add Button)
-  // We look for the 'activities-list' div inside this specific day card
-  const activityList = e.target.parentElement.querySelector(".activities-list");
-  activityList.appendChild(newRow);
-}
+// ─────────────────────────────────────────
+// CLEAR ALL
+// ─────────────────────────────────────────
 
-// --- LOAD SAVED ACTIVITIES (From Destinations Page) ---
+document.getElementById("clearAllBtn").addEventListener("click", () => {
+  if (!confirm("Clear all days and activities? This cannot be undone.")) return;
+  localStorage.removeItem("tripDays");
+  render();
+  showToast("All cleared", "warning");
+});
+
+// ─────────────────────────────────────────
+// LOAD SPOTS FROM DESTINATIONS PAGE
+// ─────────────────────────────────────────
+
 function loadSavedActivities() {
-  const trip = JSON.parse(localStorage.getItem("myTrip")) || [];
-  
-  // We simply dump saved items into "Day 1" for now
-  // In a complex app, you'd save which day they belong to.
-  const firstDayList = document.querySelector(".day-card .activities-list");
+  const pending = JSON.parse(localStorage.getItem("myTrip")) || [];
+  if (pending.length === 0) return;
 
-  if (firstDayList) {
-    trip.forEach((activity) => {
-      const row = document.createElement("div");
-      row.className = "activity-item";
-      row.innerHTML = `
-        <span class="time" style="color:#00b4d8; font-weight:bold;">Saved</span>
-        <span>${activity.name} <small style="color:#666">(${activity.price})</small></span>
-        <button onclick="this.parentElement.remove()" style="border:none; background:none; cursor:pointer; float:right;">❌</button>
-      `;
-      firstDayList.appendChild(row);
-    });
-  }
+  const days = getDays();
+  if (!days[0]) days.push({ label: "Day 1", activities: [] });
+
+  let added = 0;
+  pending.forEach((spot) => {
+      const alreadyIn = days.some(d =>
+          d.activities.some(a => a.text === `${spot.name} (${spot.price})`)
+      );
+      if (!alreadyIn) {
+          days[0].activities.push({ time: "Saved", text: `${spot.name} (${spot.price})` });
+          added++;
+      }
+  });
+
+  saveDays(days);
+  localStorage.removeItem("myTrip");
+
+  if (added > 0) showToast(`${added} spot${added > 1 ? "s" : ""} added to Day 1 ✓`);
 }
 
-// --- CHECKLIST LOGIC ---
+// ─────────────────────────────────────────
+// CHECKLIST
+// ─────────────────────────────────────────
+
 function setupChecklist() {
-  const checkboxes = document.querySelectorAll('.sidebar input[type="checkbox"]');
-  checkboxes.forEach((box, index) => {
-    const key = `checklist_${index}`;
-    if (localStorage.getItem(key) === "true") box.checked = true;
-    box.addEventListener("change", () => localStorage.setItem(key, box.checked));
+  document.querySelectorAll('.sidebar input[type="checkbox"]').forEach((box, i) => {
+      const key = `checklist_item_${i}`;
+      if (localStorage.getItem(key) === "true") box.checked = true;
+      box.addEventListener("change", () => localStorage.setItem(key, box.checked));
   });
 }
 
-// --- CLEAR ALL LOGIC ---
-function setupClearButton() {
-  const clearBtn = document.getElementById("clearAllBtn");
-  if (clearBtn) {
-    clearBtn.addEventListener("click", () => {
-      if (confirm("Clear entire itinerary?")) {
-        localStorage.clear();
-        location.reload();
-      }
-    });
-  }
-}
+// ─────────────────────────────────────────
+// INIT
+// ─────────────────────────────────────────
+
+loadSavedActivities();
+render();
+setupChecklist();
