@@ -27,6 +27,7 @@ const currencySymbols = {
   MXN:"MX$", BRL:"R$", KRW:"₩", CNY:"¥", SGD:"S$",
   THB:"฿", TRY:"₺", ZAR:"R", SEK:"kr", NOK:"kr"
 };
+
 currencySelect.innerHTML = Object.keys(currencySymbols)
   .map(c => `<option value="${c}">${c} — ${currencySymbols[c].trim()}</option>`)
   .join("");
@@ -39,6 +40,11 @@ let localCurrency = null;
 let localCityName = "";
 let showOverBudget = false;
 let activeTab     = "attractions"; // "attractions" | "hotels"
+
+// --- Filter + Sort State ---
+let activeFilter = "All";
+let activeSort   = "default";
+let activeStars  = "All";
 
 // --- City → currency map ---
 const cityToCurrency = {
@@ -65,6 +71,65 @@ const cityToCurrency = {
 function getCityKey(raw) { return raw.toLowerCase().replace(/[\s\-'\.]/g, ""); }
 function detectLocalCurrency(raw) { return cityToCurrency[getCityKey(raw)] || null; }
 
+
+// ─────────────────────────────────────────
+// SEARCH HISTORY
+// ─────────────────────────────────────────
+
+function getHistory() {
+  return JSON.parse(localStorage.getItem("searchHistory")) || [];
+}
+
+function saveToHistory(city) {
+  let history = getHistory();
+  history = history.filter(c => c.toLowerCase() !== city.toLowerCase());
+  history.unshift(city);
+  history = history.slice(0, 6);
+  localStorage.setItem("searchHistory", JSON.stringify(history));
+}
+
+function renderHistory() {
+  let container = document.getElementById("searchHistory");
+  if (!container) {
+    container = document.createElement("div");
+    container.id = "searchHistory";
+    container.style.cssText = "margin-top:10px; display:flex; flex-wrap:wrap; gap:8px; align-items:center;";
+    cityInput.parentElement.appendChild(container);
+  }
+
+  const history = getHistory();
+  if (history.length === 0) { container.innerHTML = ""; return; }
+
+  container.innerHTML = `
+    <span style="font-size:0.75rem; color:#999;">Recent:</span>
+    ${history.map(city => `
+      <button onclick="fillCity('${city}')" style="
+        background:#f1f5f9; border:1px solid #e2e8f0; border-radius:20px;
+        padding:3px 12px; font-size:0.78rem; cursor:pointer; color:#555;
+        font-family:inherit; transition:all 0.15s;"
+        onmouseover="this.style.background='#a8dadc';this.style.color='white'"
+        onmouseout="this.style.background='#f1f5f9';this.style.color='#555'">
+        📍 ${city}
+      </button>
+    `).join("")}
+    <button onclick="clearHistory()" style="
+      background:none; border:none; font-size:0.72rem;
+      color:#ccc; cursor:pointer; font-family:inherit; padding:0;">✕ clear</button>
+  `;
+}
+
+window.fillCity = function(city) {
+  cityInput.value = city;
+  discoverBtn.classList.add("active");
+  cityInput.focus();
+};
+
+window.clearHistory = function() {
+  localStorage.removeItem("searchHistory");
+  renderHistory();
+};
+
+
 // --- Exchange rates ---
 async function loadExchangeRates() {
   try {
@@ -86,17 +151,20 @@ const fmt = (n) => new Intl.NumberFormat(undefined, { maximumFractionDigits: 0 }
 function toUserCurrency(usdAmount) {
   return Math.round(usdAmount * (exchangeRates[currencySelect.value] || 1));
 }
+
 function toLocalCurrency(usdAmount) {
   if (!localCurrency || !exchangeRates[localCurrency]) return null;
   return Math.round(usdAmount * exchangeRates[localCurrency]);
 }
+
 function totalBudgetInUSD() {
   return parseFloat(budgetRange.value) / (exchangeRates[currencySelect.value] || 1);
 }
+
 function perNightBudgetInUSD() {
-  // reserve 40% of budget for hotels across all days
   return (totalBudgetInUSD() * 0.4) / parseInt(daysRange.value);
 }
+
 
 // --- Rate badge ---
 function updateRateBadge() {
@@ -107,17 +175,21 @@ function updateRateBadge() {
     badge.style.cssText = "margin-top:6px; font-size:0.8rem; color:#555; line-height:1.8;";
     currencySelect.parentElement.appendChild(badge);
   }
+
   const uc = currencySelect.value;
   const ur = exchangeRates[uc] || 1;
   const lines = [];
+
   if (uc !== "USD") {
     lines.push(`1 USD = ${ur.toFixed(2)} ${uc}`);
     lines.push(`1 ${uc} = ${(1/ur).toFixed(4)} USD`);
   }
+
   if (localCurrency && localCurrency !== uc) {
     const lr = exchangeRates[localCurrency] || 1;
     lines.push(`1 ${uc} = ${(lr/ur).toFixed(2)} ${localCurrency} <em style="color:#aaa">(${localCityName} local)</em>`);
   }
+
   badge.innerHTML = lines.join("<br>");
 }
 
@@ -126,12 +198,14 @@ const updateBudgetDisplay = () => {
   budgetValue.textContent = `${sym(uc)}${fmt(budgetRange.value)}`;
   budgetText.textContent  = `Total budget: ${sym(uc)}${fmt(budgetRange.value)}`;
   updateRateBadge();
+
   if (lastSpots.length > 0 || lastHotels.length > 0) {
     renderBudgetSummary();
     if (activeTab === "attractions") renderAttractions();
     else renderHotels();
   }
 };
+
 
 // --- Budget summary bar ---
 function renderBudgetSummary() {
@@ -146,6 +220,7 @@ function renderBudgetSummary() {
     `;
     spotsGrid.before(bar);
   }
+
   const uc = currencySelect.value;
   const days = parseInt(daysRange.value);
   const total = parseFloat(budgetRange.value);
@@ -161,6 +236,7 @@ function renderBudgetSummary() {
     ${localTotal ? `<div>🏙️ ≈ <strong>${sym(localCurrency)}${fmt(localTotal)}</strong> ${localCurrency} total</div>` : ""}
   `;
 }
+
 
 // --- Tabs ---
 function renderTabs() {
@@ -195,6 +271,7 @@ function renderTabs() {
 function switchTab(tab) {
   activeTab = tab;
   renderTabs();
+
   if (tab === "attractions") {
     if (lastSpots.length > 0) renderAttractions();
     else fetchAttractions(localCityName);
@@ -204,18 +281,148 @@ function switchTab(tab) {
   }
 }
 
+
+// --- Apply Filter + Sort (Attractions) ---
+function applyFilterSort(spots) {
+  let filtered = [...spots];
+
+  if (activeFilter !== "All") {
+    filtered = filtered.filter(s =>
+      (s.type || "").toLowerCase() === activeFilter.toLowerCase()
+    );
+  }
+
+  if (activeSort === "rating") {
+    filtered.sort((a, b) => (b.rating || 0) - (a.rating || 0));
+  } else if (activeSort === "priceLow") {
+    filtered.sort((a, b) => (a.price || 0) - (b.price || 0));
+  } else if (activeSort === "priceHigh") {
+    filtered.sort((a, b) => (b.price || 0) - (a.price || 0));
+  }
+
+  return filtered;
+}
+
+
+// --- Filter Bar (Attractions) ---
+function renderFilterBar(spots) {
+  let bar = document.getElementById("filterBar");
+  if (!bar) {
+    bar = document.createElement("div");
+    bar.id = "filterBar";
+    bar.style.cssText = `
+      display:flex;
+      flex-wrap:wrap;
+      gap:12px;
+      align-items:center;
+      margin-bottom:20px;
+    `;
+    spotsGrid.before(bar);
+  }
+
+  const types = ["All", ...new Set(spots.map(s => s.type).filter(Boolean))];
+
+  bar.innerHTML = `
+    <label style="font-size:0.85rem;color:#555;">
+      Filter:
+      <select id="typeFilter" style="margin-left:6px;padding:7px 10px;border-radius:8px;border:1px solid #ccc;">
+        ${types.map(t => `<option value="${t}" ${t===activeFilter?"selected":""}>${t}</option>`).join("")}
+      </select>
+    </label>
+
+    <label style="font-size:0.85rem;color:#555;">
+      Sort:
+      <select id="sortFilter" style="margin-left:6px;padding:7px 10px;border-radius:8px;border:1px solid #ccc;">
+        <option value="default" ${activeSort==="default"?"selected":""}>Default</option>
+        <option value="rating" ${activeSort==="rating"?"selected":""}>Highest Rating</option>
+        <option value="priceLow" ${activeSort==="priceLow"?"selected":""}>Lowest Price</option>
+        <option value="priceHigh" ${activeSort==="priceHigh"?"selected":""}>Highest Price</option>
+      </select>
+    </label>
+  `;
+
+  document.getElementById("typeFilter").addEventListener("change", (e) => {
+    activeFilter = e.target.value;
+    renderAttractions();
+  });
+
+  document.getElementById("sortFilter").addEventListener("change", (e) => {
+    activeSort = e.target.value;
+    renderAttractions();
+  });
+}
+
+
+// --- Hotel Filter Bar (Stars + Sort) ---
+function renderHotelFilterBar(hotels) {
+  let bar = document.getElementById("hotelFilterBar");
+  if (!bar) {
+    bar = document.createElement("div");
+    bar.id = "hotelFilterBar";
+    bar.style.cssText = `
+      display:flex;
+      flex-wrap:wrap;
+      gap:12px;
+      align-items:center;
+      margin-bottom:20px;
+    `;
+    spotsGrid.before(bar);
+  }
+
+  bar.innerHTML = `
+    <label style="font-size:0.85rem;color:#555;">
+      Stars:
+      <select id="starsFilter" style="margin-left:6px;padding:7px 10px;border-radius:8px;border:1px solid #ccc;">
+        <option value="All" ${activeStars==="All"?"selected":""}>All</option>
+        <option value="5" ${activeStars==="5"?"selected":""}>⭐⭐⭐⭐⭐ (5)</option>
+        <option value="4" ${activeStars==="4"?"selected":""}>⭐⭐⭐⭐ (4)</option>
+        <option value="3" ${activeStars==="3"?"selected":""}>⭐⭐⭐ (3)</option>
+        <option value="2" ${activeStars==="2"?"selected":""}>⭐⭐ (2)</option>
+        <option value="1" ${activeStars==="1"?"selected":""}>⭐ (1)</option>
+      </select>
+    </label>
+
+    <label style="font-size:0.85rem;color:#555;">
+      Sort:
+      <select id="hotelSortFilter" style="margin-left:6px;padding:7px 10px;border-radius:8px;border:1px solid #ccc;">
+        <option value="default" ${activeSort==="default"?"selected":""}>Default</option>
+        <option value="rating" ${activeSort==="rating"?"selected":""}>Highest Rating</option>
+        <option value="priceLow" ${activeSort==="priceLow"?"selected":""}>Lowest Price</option>
+        <option value="priceHigh" ${activeSort==="priceHigh"?"selected":""}>Highest Price</option>
+        <option value="starsHigh" ${activeSort==="starsHigh"?"selected":""}>Most Stars</option>
+      </select>
+    </label>
+  `;
+
+  document.getElementById("starsFilter").addEventListener("change", (e) => {
+    activeStars = e.target.value;
+    renderHotels();
+  });
+
+  document.getElementById("hotelSortFilter").addEventListener("change", (e) => {
+    activeSort = e.target.value;
+    renderHotels();
+  });
+}
+
+
 // --- Render Attractions ---
 function renderAttractions() {
   spotsGrid.innerHTML = "";
   showOverBudget = false;
 
-  const uc       = currencySelect.value;
-  const lc       = localCurrency;
+  // remove hotel filter bar if switching tabs
+  const hotelBar = document.getElementById("hotelFilterBar");
+  if (hotelBar) hotelBar.remove();
+
+  const uc        = currencySelect.value;
   const budgetUSD = totalBudgetInUSD();
 
-  // Filter: only show spots whose price fits within total budget
-  const affordable = lastSpots.filter(s => s.price === 0 || s.price <= budgetUSD);
-  const tooExp     = lastSpots.filter(s => s.price > 0 && s.price > budgetUSD);
+  renderFilterBar(lastSpots);
+
+  const filtered   = applyFilterSort(lastSpots);
+  const affordable = filtered.filter(s => s.price === 0 || s.price <= budgetUSD);
+  const tooExp     = filtered.filter(s => s.price > 0 && s.price > budgetUSD);
 
   resultsCount.textContent = `${lastSpots.length} attractions found · ${affordable.length} within your ${sym(uc)}${fmt(budgetRange.value)} budget`;
 
@@ -229,7 +436,6 @@ function renderAttractions() {
   affordable.forEach(spot => renderSpotCard(spot, false));
 
   if (tooExp.length > 0) {
-    // "Show more" toggle for over-budget spots
     const toggle = document.createElement("div");
     toggle.id = "overBudgetToggle";
     toggle.style.cssText = "grid-column:1/-1; text-align:center; margin:16px 0 8px;";
@@ -243,14 +449,16 @@ function renderAttractions() {
 
     const hiddenSection = document.createElement("div");
     hiddenSection.id = "overBudgetSection";
-    hiddenSection.style.cssText = "display:none; grid-column:1/-1; display:none;";
-    // render into a sub-grid
+    hiddenSection.style.cssText = "display:none; grid-column:1/-1;";
+
     const subGrid = document.createElement("div");
-    subGrid.style.cssText = spotsGrid.style.cssText || "display:grid; grid-template-columns:repeat(auto-fill,minmax(280px,1fr)); gap:20px;";
+    subGrid.style.cssText = "display:grid; grid-template-columns:repeat(auto-fill,minmax(280px,1fr)); gap:20px;";
+
     tooExp.forEach(spot => {
       const card = buildSpotCard(spot, true);
       subGrid.appendChild(card);
     });
+
     hiddenSection.appendChild(subGrid);
     spotsGrid.appendChild(hiddenSection);
   }
@@ -259,16 +467,24 @@ function renderAttractions() {
 window.toggleOverBudget = function() {
   const section = document.getElementById("overBudgetSection");
   const btn     = document.querySelector("#overBudgetToggle button");
+
   showOverBudget = !showOverBudget;
+
   section.style.display = showOverBudget ? "block" : "none";
-  btn.textContent = showOverBudget ? "Hide over-budget attractions ▴" : `Show ${section.querySelectorAll(".spot-card").length} attractions over budget ▾`;
+
+  btn.textContent = showOverBudget
+    ? "Hide over-budget attractions ▴"
+    : `Show ${section.querySelectorAll(".spot-card").length} attractions over budget ▾`;
 };
+
 
 function buildSpotCard(spot, dimmed) {
   const uc = currencySelect.value;
   const lc = localCurrency;
+
   const userPrice   = spot.price === 0 ? 0 : toUserCurrency(spot.price);
   const userDisplay = spot.price === 0 ? "FREE" : `${sym(uc)}${fmt(userPrice)}`;
+
   let localLine = "";
   if (lc && lc !== uc && spot.price > 0) {
     const lp = toLocalCurrency(spot.price);
@@ -277,7 +493,12 @@ function buildSpotCard(spot, dimmed) {
 
   const card = document.createElement("div");
   card.className = "spot-card";
-  if (dimmed) { card.style.opacity = "0.5"; card.style.filter = "grayscale(30%)"; }
+
+  if (dimmed) {
+    card.style.opacity = "0.5";
+    card.style.filter = "grayscale(30%)";
+  }
+
   card.innerHTML = `
     <div class="card-header"><span class="card-icon">${spot.image}</span></div>
     <div class="card-body">
@@ -302,21 +523,48 @@ function renderSpotCard(spot, dimmed) {
   spotsGrid.appendChild(buildSpotCard(spot, dimmed));
 }
 
+
 // --- Render Hotels ---
 function renderHotels() {
   spotsGrid.innerHTML = "";
+
+  // remove attractions filter bar if switching tabs
+  const attractionBar = document.getElementById("filterBar");
+  if (attractionBar) attractionBar.remove();
+
+  renderHotelFilterBar(lastHotels);
+
   const uc = currencySelect.value;
   const lc = localCurrency;
   const days = parseInt(daysRange.value);
   const nightlyBudgetUSD = perNightBudgetInUSD();
 
-  const affordable = lastHotels.filter(h => h.price_per_night <= nightlyBudgetUSD);
-  const tooExp     = lastHotels.filter(h => h.price_per_night > nightlyBudgetUSD);
+  let filteredHotels = [...lastHotels];
+
+  // stars filter
+  if (activeStars !== "All") {
+    filteredHotels = filteredHotels.filter(h => String(h.stars || 3) === activeStars);
+  }
+
+  // sorting
+  if (activeSort === "rating") {
+    filteredHotels.sort((a, b) => (b.rating || 0) - (a.rating || 0));
+  } else if (activeSort === "priceLow") {
+    filteredHotels.sort((a, b) => (a.price_per_night || 0) - (b.price_per_night || 0));
+  } else if (activeSort === "priceHigh") {
+    filteredHotels.sort((a, b) => (b.price_per_night || 0) - (a.price_per_night || 0));
+  } else if (activeSort === "starsHigh") {
+    filteredHotels.sort((a, b) => (b.stars || 0) - (a.stars || 0));
+  }
+
+  const affordable = filteredHotels.filter(h => h.price_per_night <= nightlyBudgetUSD);
+  const tooExp     = filteredHotels.filter(h => h.price_per_night > nightlyBudgetUSD);
 
   const nightlyUser = toUserCurrency(nightlyBudgetUSD);
-  resultsCount.textContent = `${lastHotels.length} hotels found · ${affordable.length} fit your nightly budget (${sym(uc)}${fmt(nightlyUser)}/night)`;
 
-  if (affordable.length === 0 && lastHotels.length > 0) {
+  resultsCount.textContent = `${filteredHotels.length} hotels found · ${affordable.length} fit your nightly budget (${sym(uc)}${fmt(nightlyUser)}/night)`;
+
+  if (affordable.length === 0 && filteredHotels.length > 0) {
     const msg = document.createElement("div");
     msg.style.cssText = "grid-column:1/-1; text-align:center; padding:30px; color:#666;";
     msg.innerHTML = `<p>😅 No hotels fit your nightly budget. Try a higher budget or fewer days.</p>`;
@@ -330,7 +578,11 @@ function renderHotels() {
 
     const card = document.createElement("div");
     card.className = "spot-card";
-    if (dimmed) { card.style.opacity = "0.5"; card.style.filter = "grayscale(30%)"; }
+
+    if (dimmed) {
+      card.style.opacity = "0.5";
+      card.style.filter = "grayscale(30%)";
+    }
 
     card.innerHTML = `
       <div class="card-header">
@@ -361,58 +613,60 @@ function renderHotels() {
   affordable.forEach(h => renderHotelCard(h, false));
 
   if (tooExp.length > 0) {
-    const toggle = document.createElement("div");
-    toggle.style.cssText = "grid-column:1/-1; text-align:center; margin:16px 0 8px;";
-    toggle.innerHTML = `
-      <button onclick="this.parentElement.nextElementSibling.style.display='block'; this.parentElement.style.display='none';" style="
-        background:none; border:1px dashed #ccc; color:#888; padding:8px 20px;
-        border-radius:20px; cursor:pointer; font-size:0.85rem; font-family:inherit;">
-        Show ${tooExp.length} hotel${tooExp.length>1?"s":""} over nightly budget ▾
-      </button>`;
-    spotsGrid.appendChild(toggle);
-    const hidden = document.createElement("div");
-    hidden.style.display = "none";
-    tooExp.forEach(h => { hidden.appendChild(document.createElement("div")); renderHotelCard(h, true); });
-    // simpler: just render after a divider
     const divider = document.createElement("div");
     divider.style.cssText = "grid-column:1/-1; text-align:center; color:#aaa; font-size:0.85rem; padding:8px 0; border-top:1px dashed #ddd;";
     divider.textContent = `⬇️ ${tooExp.length} hotel${tooExp.length>1?"s":""} over your nightly budget`;
-    toggle.after(divider);
+    spotsGrid.appendChild(divider);
+
     tooExp.forEach(h => renderHotelCard(h, true));
   }
 }
+
 
 // --- Add hotel to itinerary ---
 window.addHotelToTrip = function(button) {
   const name  = button.getAttribute("data-name");
   const price = button.getAttribute("data-price");
   const trip  = JSON.parse(localStorage.getItem("myTrip")) || [];
+
   if (trip.some(s => s.name === name)) {
     button.textContent = "Already added!";
     button.style.backgroundColor = "#f59e0b";
-    setTimeout(() => { button.textContent = "✓ Added!"; button.style.backgroundColor = "#2ecc71"; }, 1500);
+    setTimeout(() => {
+      button.textContent = "✓ Added!";
+      button.style.backgroundColor = "#2ecc71";
+    }, 1500);
     return;
   }
+
   trip.push({ name: `🏨 ${name}`, price });
   localStorage.setItem("myTrip", JSON.stringify(trip));
+
   button.textContent = "✓ Added!";
   button.style.backgroundColor = "#2ecc71";
   button.disabled = true;
 };
+
 
 // --- Add attraction to itinerary ---
 window.addToItinerary = function(button) {
   const name  = button.getAttribute("data-name");
   const price = button.getAttribute("data-price");
   const trip  = JSON.parse(localStorage.getItem("myTrip")) || [];
+
   if (trip.some(s => s.name === name)) {
     button.textContent = "Already added!";
     button.style.backgroundColor = "#f59e0b";
-    setTimeout(() => { button.textContent = "✓ Added!"; button.style.backgroundColor = "#2ecc71"; }, 1500);
+    setTimeout(() => {
+      button.textContent = "✓ Added!";
+      button.style.backgroundColor = "#2ecc71";
+    }, 1500);
     return;
   }
+
   trip.push({ name, price });
   localStorage.setItem("myTrip", JSON.stringify(trip));
+
   button.textContent = "✓ Added!";
   button.style.backgroundColor = "#2ecc71";
   button.disabled = true;
@@ -421,38 +675,38 @@ window.addToItinerary = function(button) {
 
 // --- Robust JSON parser — handles Gemini truncation ---
 function safeParseArray(text) {
-  // 1. Strip markdown fences
   text = text.replace(/```json/gi, "").replace(/```/g, "").trim();
 
-  // 2. Try straight parse first
   try { return JSON.parse(text); } catch (_) {}
 
-  // 3. Find the last COMPLETE object by scanning for closing braces
-  //    Walk backwards from the end to find the last real '}'
   let lastBrace = -1;
   let depth = 0;
   let inString = false;
   let escape = false;
+
   for (let i = 0; i < text.length; i++) {
     const ch = text[i];
+
     if (escape) { escape = false; continue; }
     if (ch === "\\") { escape = true; continue; }
     if (ch === '"') { inString = !inString; continue; }
     if (inString) continue;
+
     if (ch === "{") depth++;
-    if (ch === "}") { depth--; if (depth === 0) lastBrace = i; }
+    if (ch === "}") {
+      depth--;
+      if (depth === 0) lastBrace = i;
+    }
   }
 
   if (lastBrace === -1) return [];
 
-  // Slice up to and including the last complete }, then close the array
   const trimmed = text.substring(0, lastBrace + 1) + "]";
-
-  // Remove any leading '[' duplication
   const fixed = trimmed.startsWith("[") ? trimmed : "[" + trimmed;
 
   try { return JSON.parse(fixed); } catch (_) { return []; }
 }
+
 
 // --- Fetch Attractions ---
 async function fetchAttractions(city) {
@@ -463,7 +717,8 @@ async function fetchAttractions(city) {
     const res = await fetch(
       `https://generativelanguage.googleapis.com/v1/models/gemini-2.5-flash:generateContent?key=${API_KEY}`,
       {
-        method:"POST", headers:{"Content-Type":"application/json"},
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
         body: JSON.stringify({
           contents:[{parts:[{
             text:`You are a travel API. List up to 30 real tourist attractions, landmarks, museums, markets, parks, and activities in ${city}.
@@ -476,6 +731,7 @@ Keep each desc under 15 words. Compact format required.
         })
       }
     );
+
     const data = await res.json();
     if (data.error) throw new Error(data.error.message);
 
@@ -483,15 +739,21 @@ Keep each desc under 15 words. Compact format required.
     text = text.replace(/```json/gi,"").replace(/```/g,"").trim();
 
     lastSpots = safeParseArray(text);
+
+    activeFilter = "All";
+    activeSort   = "default";
+
     renderBudgetSummary();
     renderTabs();
     renderAttractions();
+
   } catch(err) {
     console.error(err);
     spotsGrid.innerHTML = `<div style="grid-column:1/-1;text-align:center;color:#e74c3c;padding:40px;">
       <h3>Could not load attractions</h3><p>${err.message}</p></div>`;
   }
 }
+
 
 // --- Fetch Hotels ---
 async function fetchHotels(city) {
@@ -502,7 +764,8 @@ async function fetchHotels(city) {
     const res = await fetch(
       `https://generativelanguage.googleapis.com/v1/models/gemini-2.5-flash:generateContent?key=${API_KEY}`,
       {
-        method:"POST", headers:{"Content-Type":"application/json"},
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
         body: JSON.stringify({
           contents:[{parts:[{
             text:`You are a hotel search API. List 20 real hotels in ${city} across budget, mid-range, and luxury tiers.
@@ -515,6 +778,7 @@ Keep each desc under 15 words. Compact format required.
         })
       }
     );
+
     const data = await res.json();
     if (data.error) throw new Error(data.error.message);
 
@@ -522,7 +786,13 @@ Keep each desc under 15 words. Compact format required.
     text = text.replace(/```json/gi,"").replace(/```/g,"").trim();
 
     lastHotels = safeParseArray(text);
+
+    activeStars = "All";
+    activeSort  = "default";
+
+    renderTabs();
     renderHotels();
+
   } catch(err) {
     console.error(err);
     spotsGrid.innerHTML = `<div style="grid-column:1/-1;text-align:center;color:#e74c3c;padding:40px;">
@@ -530,16 +800,24 @@ Keep each desc under 15 words. Compact format required.
   }
 }
 
+
 // --- Discover button ---
 discoverBtn.addEventListener("click", () => {
   const rawCity = cityInput.value.trim();
   if (!rawCity) { alert("Please enter a city!"); return; }
 
+  saveToHistory(rawCity);
+
   localCityName = rawCity;
   localCurrency = detectLocalCurrency(rawCity);
+
   lastSpots     = [];
   lastHotels    = [];
   activeTab     = "attractions";
+
+  activeFilter = "All";
+  activeSort   = "default";
+  activeStars  = "All";
 
   resultsSection.style.display = "block";
   resultsTitle.textContent  = `Best Spots in ${rawCity}`;
@@ -550,8 +828,10 @@ discoverBtn.addEventListener("click", () => {
 
   updateRateBadge();
   fetchAttractions(rawCity);
+
   resultsSection.scrollIntoView({ behavior:"smooth" });
 });
+
 
 // --- Listeners ---
 daysRange.addEventListener("input", e => {
@@ -559,11 +839,15 @@ daysRange.addEventListener("input", e => {
   daysText.textContent  = e.target.value === "1" ? "1 day" : `${e.target.value} days`;
   updateBudgetDisplay();
 });
+
 budgetRange.addEventListener("input", updateBudgetDisplay);
 currencySelect.addEventListener("change", updateBudgetDisplay);
+
 cityInput.addEventListener("input", () => {
   discoverBtn.classList.toggle("active", cityInput.value.trim().length > 0);
 });
 
+
 // --- Boot ---
 loadExchangeRates().then(updateBudgetDisplay);
+renderHistory();

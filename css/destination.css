@@ -354,3 +354,50 @@
   0% { transform: rotate(0deg); }
   100% { transform: rotate(360deg); }
 }
+
+/* ── Paste these into your destination.css, replacing any existing .input-group rules ── */
+
+.search-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+/* Single 2-column grid for all 4 fields */
+.fields-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px 32px;
+  margin-bottom: 24px;
+  align-items: start;
+}
+
+/* Remove old input-group layout */
+.input-group {
+  display: contents; /* lets children flow into .fields-grid */
+}
+
+#currencySelect {
+  width: 100%;
+}
+
+#rateBadge {
+  margin-top: 8px;
+  font-size: 0.8rem;
+  color: #555;
+  line-height: 1.8;
+}
+
+#searchHistory {
+  margin-top: 10px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+@media (max-width: 640px) {
+  .fields-grid {
+    grid-template-columns: 1fr;
+  }
+}

@@ -26,12 +26,18 @@
 
   <section class="search-container">
     <div class="search-card">
-      <div class="input-group">
+
+      <!-- Single 2x2 grid: City + Budget on left, Duration + Currency on right -->
+      <div class="fields-grid">
+
+        <!-- LEFT TOP: City -->
         <div class="field">
           <label><span class="icon">📍</span> Destination City</label>
           <input type="text" id="cityInput" placeholder="Where do you want to go?" />
+          <!-- search history injected here by JS -->
         </div>
 
+        <!-- RIGHT TOP: Duration -->
         <div class="field">
           <label><span class="icon">📅</span> Duration (Days)</label>
           <div class="slider-container">
@@ -40,9 +46,8 @@
           </div>
           <small class="helper-text" id="daysText">3 days</small>
         </div>
-      </div>
 
-      <div class="input-group">
+        <!-- LEFT BOTTOM: Budget -->
         <div class="field">
           <label><span class="icon">💲</span> Budget Limit</label>
           <div class="slider-container">
@@ -52,34 +57,33 @@
           <small class="helper-text" id="budgetText">Total budget: $5,000</small>
         </div>
 
+        <!-- RIGHT BOTTOM: Currency -->
         <div class="field">
           <label><span class="icon">🌐</span> Currency</label>
-          <select id="currencySelect">
-            <option value="USD">USD - $</option>
-            <option value="EUR">EUR - €</option>
-            <option value="GBP">GBP - £</option>
-          </select>
+          <select id="currencySelect"></select>
+          <!-- rate badge injected here by JS -->
         </div>
+
       </div>
 
       <button class="discover-btn" id="discoverBtn">Discover Best Spots</button>
+
     </div>
   </section>
 
-  <section id="resultsSection" class="results-container" style="display: none;">
+  <section id="resultsSection" class="results-container" style="display:none;">
     <div class="results-header">
       <h2 id="resultsTitle">Best Spots in ...</h2>
       <p id="resultsCount">0 attractions within your budget</p>
     </div>
-  
+
     <div class="stats-row">
       <div class="stat-card">Duration: <strong id="statDays">0 days</strong></div>
       <div class="stat-card">Budget: <strong id="statBudget">$0</strong></div>
       <div class="stat-card">Currency: <strong id="statCurrency">USD</strong></div>
     </div>
-  
-    <div class="spots-grid" id="spotsGrid">
-      </div>
+
+    <div class="spots-grid" id="spotsGrid"></div>
   </section>
 
 </body>
