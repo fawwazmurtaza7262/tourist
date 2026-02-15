@@ -375,3 +375,95 @@ textarea {
         position: static;
     }
 }
+
+.map-section {
+    margin-top: 32px;
+    border-radius: 16px;
+    overflow: hidden;
+    border: 1px solid #e2e8f0;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.06);
+}
+
+.map-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 20px;
+    background: white;
+    border-bottom: 1px solid #e2e8f0;
+}
+
+.map-header h3 {
+    font-size: 1rem;
+    font-weight: 700;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.map-toggle-btn {
+    padding: 7px 18px;
+    background: #a8dadc;
+    color: white;
+    border: none;
+    border-radius: 20px;
+    font-size: 0.82rem;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: inherit;
+    transition: background 0.2s;
+}
+.map-toggle-btn:hover { background: #00b4d8; }
+
+.map-body {
+    display: none;
+    background: #f8f9fa;
+}
+.map-body.open { display: block; }
+
+#tripMap {
+    height: 420px;
+    width: 100%;
+}
+
+.map-legend {
+    display: flex;
+    gap: 16px;
+    padding: 10px 20px;
+    background: white;
+    border-top: 1px solid #e2e8f0;
+    font-size: 0.78rem;
+    color: #64748b;
+    flex-wrap: wrap;
+}
+.legend-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+.legend-dot {
+    width: 10px; height: 10px;
+    border-radius: 50%; flex-shrink: 0;
+}
+
+.map-empty {
+    padding: 40px;
+    text-align: center;
+    color: #94a3b8;
+    font-size: 0.88rem;
+}
+.map-empty span { font-size: 2rem; display: block; margin-bottom: 10px; }
+
+/* Leaflet popup style */
+.leaflet-popup-content-wrapper {
+    border-radius: 10px !important;
+    font-family: inherit !important;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.12) !important;
+}
+.leaflet-popup-content { margin: 12px 14px !important; min-width: 160px; }
+.pop-tag { font-size: 0.65rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 4px; }
+.pop-name { font-weight: 700; font-size: 0.9rem; margin-bottom: 4px; }
+.pop-sub { font-size: 0.75rem; color: #64748b; }
+.pop-chips { display: flex; gap: 5px; margin-top: 7px; flex-wrap: wrap; }
+.pop-chip { padding: 2px 7px; border-radius: 5px; font-size: 0.68rem; font-weight: 600; }

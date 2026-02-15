@@ -5,12 +5,14 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Plan Trip - Tourist Planner</title>
     <link rel="stylesheet" href="/css/plan.css">
-    
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.min.css"/>
+    <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.min.js"></script>
     <script src="/js/config.js"></script>
-    <script src="/js/plan.js" defer></script>
+    <script src="/js/plan.js"></script>
 </head>
 <body>
-    <header>
+
+<header>
     <h1>Tourist Planner</h1>
     <nav>
         <a href="main.html">Home</a>
@@ -30,13 +32,35 @@
         <div id="daysContainer"></div>
 
         <button id="addDayBtn" class="add-day-btn">+ Add Day</button>
+
+        <!-- MAP SECTION -->
+        <div class="map-section" style="margin-top:32px; border-radius:16px; overflow:hidden; border:1px solid #e2e8f0; box-shadow:0 4px 24px rgba(0,0,0,0.06);">
+            <div style="display:flex; align-items:center; justify-content:space-between; padding:16px 20px; background:white; border-bottom:1px solid #e2e8f0;">
+                <h3 style="margin:0; font-size:1rem; font-weight:700;">🗺️ Trip Map <span id="mapPinCount" style="font-size:0.75rem; color:#94a3b8; font-weight:400;"></span></h3>
+                <button id="mapToggleBtn"
+                    style="padding:7px 18px; background:#a8dadc; color:white; border:none; border-radius:20px; font-size:0.82rem; font-weight:600; cursor:pointer; font-family:inherit;">
+                    Show Map
+                </button>
+
+            </div>
+            <div id="mapBody" style="display:none;">
+                <div id="tripMap" style="height:420px; width:100%;"></div>
+                <div style="display:flex; gap:16px; padding:10px 20px; background:white; border-top:1px solid #e2e8f0; font-size:0.78rem; color:#64748b; flex-wrap:wrap;">
+                    <div style="display:flex;align-items:center;gap:6px;"><div style="width:10px;height:10px;border-radius:50%;background:#2563eb;"></div> Hotel</div>
+                    <div style="display:flex;align-items:center;gap:6px;"><div style="width:10px;height:10px;border-radius:50%;background:#00b4d8;"></div> Attraction</div>
+                    <div style="display:flex;align-items:center;gap:6px;"><div style="width:22px;border-top:2px dashed #a8dadc;"></div> Distance line</div>
+                </div>
+            </div>
+        </div>
+
     </div>
 
     <div class="sidebar">
         <div class="budget-summary">
             <strong>Budget Tracker</strong><br>
-            Remaining: $5,000 / $5,000
+            Remaining: <span id="budgetRemaining">$0</span> / <span id="budgetTotal">$0</span>
         </div>
+        
 
         <h3>Packing Checklist</h3>
         <div><label><input type="checkbox"> Passport</label></div>
@@ -66,3 +90,6 @@
         </div>
     </div>
 </div>
+
+</body>
+</html>
