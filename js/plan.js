@@ -1,18 +1,56 @@
 document.addEventListener("DOMContentLoaded", function() {
 
+  // ─────────────────────────────────────────
+  // DATE LOGIC & STATE
+  // ─────────────────────────────────────────
+
+  function getStartDate() {
+    return localStorage.getItem("tripStartDate") || null;
+  }
+
+  function setStartDate(dateString) {
+    if (dateString) {
+        localStorage.setItem("tripStartDate", dateString);
+    } else {
+        localStorage.removeItem("tripStartDate");
+    }
+  }
+
   function getDays() {
     const saved = JSON.parse(localStorage.getItem("tripDays"));
-    if (saved && saved.length > 0) return saved;
+    const startDateRaw = getStartDate();
+    let startDate = startDateRaw ? new Date(startDateRaw + "T00:00:00") : null;
 
-    const totalDays = parseInt(localStorage.getItem("selectedDays")) || 1;
-
-    const newDays = [];
-    for (let i = 1; i <= totalDays; i++) {
-      newDays.push({ label: `Day ${i}`, activities: [] });
+    let totalDays = 0;
+    if (saved && saved.length > 0) {
+        totalDays = saved.length;
+    } else {
+        totalDays = parseInt(localStorage.getItem("selectedDays")) || 1;
     }
 
-    localStorage.setItem("tripDays", JSON.stringify(newDays));
-    return newDays;
+    const days = [];
+    for (let i = 0; i < totalDays; i++) {
+      let label = `Day ${i + 1}`;
+      let subLabel = "";
+
+      if (startDate) {
+        const current = new Date(startDate);
+        current.setDate(startDate.getDate() + i);
+        label = current.toLocaleDateString("en-US", { weekday: 'short', month: 'short', day: 'numeric' });
+        subLabel = `Day ${i + 1}`;
+      }
+
+      const existingActs = (saved && saved[i]) ? saved[i].activities : [];
+      
+      days.push({ 
+        label: label, 
+        subLabel: subLabel,
+        activities: existingActs 
+      });
+    }
+
+    localStorage.setItem("tripDays", JSON.stringify(days));
+    return days;
   }
 
   function saveDays(days) {
@@ -20,11 +58,12 @@ document.addEventListener("DOMContentLoaded", function() {
   }
 
   // ─────────────────────────────────────────
-  // TOAST
+  // TOAST (Notification)
   // ─────────────────────────────────────────
 
   function showToast(message, type = "success") {
     const toast = document.getElementById("toast");
+    if (!toast) return;
     toast.textContent = message;
     toast.className = `toast ${type} show`;
     clearTimeout(toast._timer);
@@ -34,7 +73,131 @@ document.addEventListener("DOMContentLoaded", function() {
   }
 
   // ─────────────────────────────────────────
-  // RENDER
+  // CUSTOM CONFIRM MODAL (Replaces Browser Alert)
+  // ─────────────────────────────────────────
+
+  function createConfirmModal() {
+    if (document.getElementById("confirmModal")) return;
+
+    // 1. Inject Styles dynamically
+    const style = document.createElement("style");
+    style.innerHTML = `
+      #confirmModal {
+        position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+        background: rgba(0,0,0,0.5); display: none; align-items: center; justify-content: center; z-index: 2000;
+        opacity: 0; transition: opacity 0.2s ease;
+      }
+      #confirmModal.open { display: flex; opacity: 1; }
+      #confirmModal .confirm-content {
+        background: white; padding: 24px; border-radius: 12px; width: 90%; max-width: 320px;
+        text-align: center; box-shadow: 0 10px 25px rgba(0,0,0,0.2); transform: scale(0.9); transition: transform 0.2s ease;
+      }
+      #confirmModal.open .confirm-content { transform: scale(1); }
+      .confirm-actions { display: flex; gap: 12px; justify-content: center; margin-top: 24px; }
+      .confirm-btn { padding: 10px 20px; border-radius: 8px; border: none; cursor: pointer; font-weight: 600; font-size: 0.9rem; transition: background 0.2s; }
+      .confirm-cancel { background: #f1f5f9; color: #64748b; }
+      .confirm-cancel:hover { background: #e2e8f0; }
+      .confirm-ok { background: #ef4444; color: white; box-shadow: 0 2px 5px rgba(239, 68, 68, 0.3); }
+      .confirm-ok:hover { background: #dc2626; }
+    `;
+    document.head.appendChild(style);
+
+    // 2. Inject HTML
+    const modal = document.createElement("div");
+    modal.id = "confirmModal";
+    modal.innerHTML = `
+      <div class="confirm-content">
+        <div style="font-size:2rem; margin-bottom:10px;">⚠️</div>
+        <h3 style="margin:0 0 8px; font-size:1.1rem; color:#1e293b;">Are you sure?</h3>
+        <p id="confirmText" style="color:#64748b; font-size:0.9rem; margin:0; line-height:1.5;">Confirm action</p>
+        <div class="confirm-actions">
+          <button class="confirm-btn confirm-cancel" id="confirmCancelBtn">Cancel</button>
+          <button class="confirm-btn confirm-ok" id="confirmOkBtn">Yes, Delete</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(modal);
+
+    // 3. Close Logic
+    modal.addEventListener("click", (e) => {
+      if (e.target === modal) closeConfirm();
+    });
+    document.getElementById("confirmCancelBtn").addEventListener("click", closeConfirm);
+  }
+
+  let _confirmCallback = null;
+
+  function showConfirm(message, onYes) {
+    createConfirmModal(); // Ensure it exists
+    
+    const modal = document.getElementById("confirmModal");
+    const text = document.getElementById("confirmText");
+    const okBtn = document.getElementById("confirmOkBtn");
+
+    text.textContent = message;
+    _confirmCallback = onYes;
+
+    // Clone button to remove old listeners (avoids duplicate actions)
+    const newOk = okBtn.cloneNode(true);
+    okBtn.parentNode.replaceChild(newOk, okBtn);
+    
+    newOk.addEventListener("click", () => {
+      if (_confirmCallback) _confirmCallback();
+      closeConfirm();
+    });
+
+    modal.classList.add("open");
+  }
+
+  function closeConfirm() {
+    const modal = document.getElementById("confirmModal");
+    if (modal) modal.classList.remove("open");
+    _confirmCallback = null;
+  }
+
+  // ─────────────────────────────────────────
+  // SIDEBAR: DATE PICKER
+  // ─────────────────────────────────────────
+
+  function renderDatePicker() {
+    let container = document.getElementById("datePickerContainer");
+    
+    if (!container) {
+        container = document.createElement("div");
+        container.id = "datePickerContainer";
+        container.style.cssText = `
+            background: white; padding: 16px; border-radius: 12px; 
+            margin-bottom: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+        `;
+        const sidebar = document.querySelector(".sidebar");
+        sidebar.insertBefore(container, sidebar.firstChild);
+    }
+
+    const savedDate = getStartDate() || "";
+
+    container.innerHTML = `
+        <label style="display:block; font-size:0.75rem; font-weight:700; text-transform:uppercase; color:#94a3b8; margin-bottom:8px;">
+            📅 Trip Start Date
+        </label>
+        <input type="date" id="tripStartInput" value="${savedDate}" style="
+            width: 100%; padding: 8px 10px; border: 1px solid #e2e8f0; 
+            border-radius: 6px; font-family: inherit; color: #334155;
+            outline: none; transition: border 0.2s;
+        ">
+    `;
+
+    const input = document.getElementById("tripStartInput");
+    input.addEventListener("focus", () => input.style.borderColor = "#0ea5e9");
+    input.addEventListener("blur", () => input.style.borderColor = "#e2e8f0");
+    input.addEventListener("change", (e) => {
+        setStartDate(e.target.value);
+        render();
+        showToast("Dates updated ✓");
+    });
+  }
+
+  // ─────────────────────────────────────────
+  // RENDER TIMELINE
   // ─────────────────────────────────────────
 
   function render() {
@@ -54,22 +217,26 @@ document.addEventListener("DOMContentLoaded", function() {
       const header = document.createElement("div");
       header.className = "day-header";
       header.innerHTML = `
-        <h3>${day.label}</h3>
-        <button class="delete-day-btn" title="Remove this day" data-day="${dayIndex}">✕ Remove day</button>
+        <div style="display:flex; flex-direction:column;">
+            <h3 style="margin-bottom:2px; font-size:1.1rem;">${day.label}</h3>
+            ${day.subLabel ? `<span style="font-size:0.75rem; color:#94a3b8; font-weight:600; text-transform:uppercase; letter-spacing:0.05em;">${day.subLabel}</span>` : ""}
+        </div>
+        <button class="delete-day-btn" title="Remove this day" data-day="${dayIndex}" style="font-size:0.8rem;">✕ Remove</button>
       `;
       card.appendChild(header);
 
       if (day.activities.length === 0) {
         const empty = document.createElement("p");
         empty.className = "empty-state";
-        empty.style.padding = "10px 0 5px";
+        empty.style.padding = "12px 0 8px";
         empty.textContent = "No activities yet.";
         card.appendChild(empty);
       } else {
         day.activities.forEach((act, actIndex) => {
           const row = document.createElement("div");
           row.className = "activity-item";
-          const isSaved = act.time === "Saved";
+          const isSaved = act.time === "Saved"; 
+          
           row.innerHTML = `
             <span class="time ${isSaved ? "saved-tag" : ""}">${act.time}</span>
             <span class="activity-text">${act.text}</span>
@@ -88,6 +255,7 @@ document.addEventListener("DOMContentLoaded", function() {
       container.appendChild(card);
     });
 
+    // Delete Activity
     container.querySelectorAll(".delete-btn").forEach(btn => {
       btn.addEventListener("click", () => {
         const days = getDays();
@@ -97,14 +265,17 @@ document.addEventListener("DOMContentLoaded", function() {
       });
     });
 
+    // Remove Day (Updated to use Custom Modal)
     container.querySelectorAll(".delete-day-btn").forEach(btn => {
       btn.addEventListener("click", () => {
-        if (!confirm(`Remove ${getDays()[btn.dataset.day].label}?`)) return;
-        const days = getDays();
-        days.splice(Number(btn.dataset.day), 1);
-        saveDays(days);
-        render();
-        showToast("Day removed", "warning");
+        const dayLabel = getDays()[btn.dataset.day].label;
+        showConfirm(`Remove ${dayLabel} and its activities?`, () => {
+            const days = getDays();
+            days.splice(Number(btn.dataset.day), 1);
+            saveDays(days);
+            render();
+            showToast("Day removed", "warning");
+        });
       });
     });
 
@@ -125,49 +296,71 @@ document.addEventListener("DOMContentLoaded", function() {
 
   function openModal(dayIndex) {
     _activeDayIndex = dayIndex;
-
-    // 1. Clear the inputs
     document.getElementById("activityTime").value = "";
     const nameInput = document.getElementById("activityName");
     nameInput.value = "";
-
-    // 2. Show the Saved Spots with "Remove" buttons
+    renderDaySelect(dayIndex);
     renderSavedSuggestions(nameInput);
-
     document.getElementById("activityModal").classList.add("open");
     document.getElementById("activityTime").focus();
   }
 
-  // --- NEW: Render Saved Spots as Tags with 'X' ---
+  function renderDaySelect(selectedIndex) {
+    const timeInput = document.getElementById("activityTime");
+    let container = document.getElementById("daySelectContainer");
+    
+    if (!container) {
+      container = document.createElement("div");
+      container.id = "daySelectContainer";
+      container.style.marginBottom = "15px";
+      const label = document.createElement("label");
+      label.textContent = "CHOOSE DAY";
+      label.style.cssText = "display:block; font-size:0.75rem; font-weight:700; text-transform:uppercase; color:#94a3b8; margin-bottom:6px; letter-spacing:0.05em;";
+      const select = document.createElement("select");
+      select.id = "activityDaySelect";
+      select.style.cssText = "width: 100%; padding: 10px; border: 1px solid #e2e8f0; border-radius: 8px; font-family: inherit; background: white; font-size: 0.95rem; color: #334155; outline: none;";
+      container.appendChild(label);
+      container.appendChild(select);
+      
+      const prev = timeInput.previousElementSibling;
+      if (prev && prev.tagName === "LABEL") timeInput.parentNode.insertBefore(container, prev);
+      else timeInput.parentNode.insertBefore(container, timeInput);
+    }
+
+    const select = document.getElementById("activityDaySelect");
+    select.innerHTML = "";
+    const days = getDays();
+    days.forEach((day, index) => {
+      const option = document.createElement("option");
+      option.value = index;
+      let text = day.label; 
+      if (day.subLabel) text += ` (${day.subLabel})`;
+      option.textContent = text;
+      select.appendChild(option);
+    });
+    select.value = selectedIndex;
+  }
+
   function renderSavedSuggestions(inputElement) {
     const saved = JSON.parse(localStorage.getItem("myTrip")) || [];
     const containerId = "saved-suggestions-container";
-    
-    // 1. Create the container div if it doesn't exist
     let container = document.getElementById(containerId);
     if (!container) {
       container = document.createElement("div");
       container.id = containerId;
-      // Style: Flexbox for tags
       container.style.cssText = "display:flex; flex-wrap:wrap; gap:8px; margin-top:10px;";
-      // Insert it right after the input field
       inputElement.parentNode.insertBefore(container, inputElement.nextSibling);
     }
 
-    // 2. Clear current list
     container.innerHTML = "";
-
     if (saved.length === 0) return;
 
-    // 3. Add a small label
     const label = document.createElement("div");
     label.textContent = "Saved Spots (Click to add, X to remove):";
     label.style.cssText = "width:100%; font-size:0.75rem; color:#94a3b8; margin-bottom:4px;";
     container.appendChild(label);
 
-    // 4. Create a tag for each spot
     saved.forEach((spot, index) => {
-      // Skip hotels
       if (spot.name.includes("🏨")) return;
 
       const chip = document.createElement("div");
@@ -179,34 +372,20 @@ document.addEventListener("DOMContentLoaded", function() {
       chip.onmouseover = () => chip.style.background = "#e0f2fe";
       chip.onmouseout  = () => chip.style.background = "#f0f9ff";
 
-      // NAME part (Click to fill input)
       const text = document.createElement("span");
       text.textContent = spot.name;
-      text.onclick = () => {
-        inputElement.value = spot.name;
-        inputElement.focus();
-      };
+      text.onclick = () => { inputElement.value = spot.name; inputElement.focus(); };
 
-      // DELETE part (Click to remove)
       const delBtn = document.createElement("span");
-      delBtn.innerHTML = "&times;"; // The 'X' symbol
+      delBtn.innerHTML = "&times;";
       delBtn.title = "Remove from saved";
-      delBtn.style.cssText = `
-        margin-left:8px; font-weight:bold; color:#7dd3fc; 
-        border-left:1px solid #bae6fd; padding-left:8px;
-        font-size:1.1rem; line-height:1;
-      `;
-      // Hover effect for the X
-      delBtn.onmouseover = (e) => { e.stopPropagation(); delBtn.style.color = "#ef4444"; };
-      delBtn.onmouseout  = (e) => { e.stopPropagation(); delBtn.style.color = "#7dd3fc"; };
-      
+      delBtn.style.cssText = "margin-left:8px; font-weight:bold; color:#7dd3fc; border-left:1px solid #bae6fd; padding-left:8px; font-size:1.1rem; line-height:1;";
       delBtn.onclick = (e) => {
-        e.stopPropagation(); // Stop it from filling the input
+        e.stopPropagation();
         if (confirm(`Remove "${spot.name}" from your saved list?`)) {
-            saved.splice(index, 1); // Remove from array
-            localStorage.setItem("myTrip", JSON.stringify(saved)); // Update storage
-            renderSavedSuggestions(inputElement); // Refresh the list
-            showToast("Removed from saved list", "warning");
+            saved.splice(index, 1);
+            localStorage.setItem("myTrip", JSON.stringify(saved));
+            renderSavedSuggestions(inputElement);
         }
       };
 
@@ -221,61 +400,30 @@ document.addEventListener("DOMContentLoaded", function() {
     _activeDayIndex = null;
   }
 
-  // --- BUTTONS & LISTENERS ---
-
-  document.getElementById("modalCancel").addEventListener("click", closeModal);
-
-  document.getElementById("activityModal").addEventListener("click", (e) => {
-    if (e.target === e.currentTarget) closeModal();
-  });
-
-  document.getElementById("modalConfirm").addEventListener("click", () => {
-    const time = document.getElementById("activityTime").value.trim();
-    const text = document.getElementById("activityName").value.trim();
-
-    if (!time || !text) {
-      showToast("Please fill in both fields", "error");
-      return;
-    }
-
-    const days = getDays();
-    days[_activeDayIndex].activities.push({ time, text });
-    saveDays(days);
-    closeModal();
-    render();
-    showToast("Activity added ✓");
-  });
-
-  document.addEventListener("keydown", (e) => {
-    if (e.key === "Enter" && document.getElementById("activityModal").classList.contains("open")) {
-      document.getElementById("modalConfirm").click();
-    }
-    if (e.key === "Escape") closeModal();
-  });
-  
-  // --- BUTTONS & EVENT LISTENERS (Must Keep These!) ---
-
-  document.getElementById("modalCancel").addEventListener("click", closeModal);
+  const modalCancel = document.getElementById("modalCancel");
+  if(modalCancel) modalCancel.addEventListener("click", closeModal);
 
   document.getElementById("activityModal").addEventListener("click", (e) => {
     if (e.target === e.currentTarget) closeModal();
   });
 
-  document.getElementById("modalConfirm").addEventListener("click", () => {
+  const modalConfirm = document.getElementById("modalConfirm");
+  if(modalConfirm) modalConfirm.addEventListener("click", () => {
     const time = document.getElementById("activityTime").value.trim();
     const text = document.getElementById("activityName").value.trim();
+    const select = document.getElementById("activityDaySelect");
+    const targetDayIndex = select ? Number(select.value) : _activeDayIndex;
 
-    if (!time || !text) {
-      showToast("Please fill in both fields", "error");
-      return;
-    }
+    if (!time || !text) { showToast("Please fill in both fields", "error"); return; }
 
     const days = getDays();
-    days[_activeDayIndex].activities.push({ time, text });
-    saveDays(days);
-    closeModal();
-    render();
-    showToast("Activity added ✓");
+    if (days[targetDayIndex]) {
+        days[targetDayIndex].activities.push({ time, text });
+        saveDays(days);
+        closeModal();
+        render();
+        showToast(`Activity added to ${days[targetDayIndex].label} ✓`);
+    }
   });
 
   document.addEventListener("keydown", (e) => {
@@ -286,7 +434,7 @@ document.addEventListener("DOMContentLoaded", function() {
   });
 
   // ─────────────────────────────────────────
-  // ADD DAY
+  // ADD DAY & CLEAR (Updated with Custom Modal)
   // ─────────────────────────────────────────
 
   document.getElementById("addDayBtn").addEventListener("click", () => {
@@ -297,149 +445,19 @@ document.addEventListener("DOMContentLoaded", function() {
     showToast(`Day ${days.length} added ✓`);
   });
 
-  // ─────────────────────────────────────────
-  // CLEAR ALL
-  // ─────────────────────────────────────────
-
   document.getElementById("clearAllBtn").addEventListener("click", () => {
-    if (!confirm("Clear all days and activities? This cannot be undone.")) return;
-    localStorage.removeItem("tripDays");
-    render();
-    showToast("All cleared", "warning");
+    // ⬇️ REPLACED browser confirm() with showConfirm()
+    showConfirm("Clear all days and activities? This cannot be undone.", () => {
+        localStorage.removeItem("tripDays");
+        localStorage.removeItem("tripStartDate");
+        document.getElementById("tripStartInput").value = "";
+        render();
+        showToast("All cleared", "warning");
+    });
   });
 
   // ─────────────────────────────────────────
-  // DAY PICKER MODAL (IMPORT SPOTS)
-  // ─────────────────────────────────────────
-
-  let _pendingSpotToAdd = null;
-  let _importQueue = [];
-
-  function openDayPickerModal(spot) {
-    _pendingSpotToAdd = spot;
-
-    const days = getDays();
-    const select = document.getElementById("dayPickerSelect");
-    const text = document.getElementById("dayPickerText");
-
-    text.textContent = `Schedule visit for: ${spot.name}`;
-
-    // 1. DYNAMICALLY ADD TIME INPUT IF MISSING
-    // This ensures we don't crash if your HTML doesn't have this input yet.
-    let timeInput = document.getElementById("dayPickerTime");
-    if (!timeInput) {
-      timeInput = document.createElement("input");
-      timeInput.id = "dayPickerTime";
-      timeInput.type = "text";
-      timeInput.placeholder = "Enter Time (e.g. 10:00 AM)";
-      // Style it to match your other inputs
-      timeInput.style.cssText = "display:block; width:100%; margin-top:10px; padding:8px; box-sizing:border-box; border:1px solid #ccc; border-radius:4px;";
-      
-      // Insert it right after the day dropdown
-      select.insertAdjacentElement('afterend', timeInput);
-    }
-    
-    // Clear previous value and focus
-    timeInput.value = "";
-    
-    // Populate Days
-    select.innerHTML = "";
-    days.forEach((day, i) => {
-      const option = document.createElement("option");
-      option.value = i;
-      option.textContent = day.label;
-      select.appendChild(option);
-    });
-
-    document.getElementById("dayPickerModal").classList.add("open");
-    
-    // Focus the time input automatically for speed
-    setTimeout(() => timeInput.focus(), 100);
-  }
-
-  function closeDayPickerModal() {
-    document.getElementById("dayPickerModal").classList.remove("open");
-    _pendingSpotToAdd = null;
-  }
-
-  document.getElementById("dayPickerCancel").addEventListener("click", () => {
-    closeDayPickerModal();
-    showToast("Import cancelled", "warning");
-  });
-
-  document.getElementById("dayPickerConfirm").addEventListener("click", () => {
-    if (!_pendingSpotToAdd) return;
-
-    const days = getDays();
-    const selectedDay = Number(document.getElementById("dayPickerSelect").value);
-    
-    // 2. GET THE CHOSEN TIME
-    const timeInput = document.getElementById("dayPickerTime");
-    // Default to "TBD" if they leave it blank
-    const selectedTime = timeInput && timeInput.value.trim() !== "" ? timeInput.value.trim() : "TBD";
-
-    days[selectedDay].activities.push({
-      time: selectedTime, // Use the user's input instead of "Saved"
-      text: `${_pendingSpotToAdd.name} (${_pendingSpotToAdd.price})`
-    });
-
-    saveDays(days);
-    render();
-    closeDayPickerModal();
-
-    if (_importQueue.length > 0) {
-      setTimeout(() => {
-        openDayPickerModal(_importQueue.shift());
-      }, 200);
-    } else {
-      showToast("All spots imported ✓");
-    }
-  });
-
-  // ─────────────────────────────────────────
-  // IMPORT SPOTS FROM DESTINATION PAGE
-  // ─────────────────────────────────────────
-
-  function loadSavedActivities() {
-    const pending = JSON.parse(localStorage.getItem("myTrip")) || [];
-    if (pending.length === 0) return;
-
-    const days = getDays();
-    if (days.length === 0) {
-      days.push({ label: "Day 1", activities: [] });
-      saveDays(days);
-    }
-
-    _importQueue = [];
-
-    pending.forEach((spot) => {
-      if (!spot.name) return;
-
-      // Hotel goes into savedHotel only
-      if (spot.name.startsWith("🏨")) {
-        const hotelName = spot.name.replace("🏨 ", "");
-        localStorage.setItem("savedHotel", JSON.stringify({ name: hotelName, price: spot.price }));
-        return;
-      }
-
-      // Avoid duplicates
-      const alreadyIn = days.some(d =>
-        d.activities.some(a => a.text === `${spot.name} (${spot.price})`)
-      );
-
-      if (!alreadyIn) _importQueue.push(spot);
-    });
-
-    localStorage.removeItem("myTrip");
-
-    if (_importQueue.length > 0) {
-      showToast(`${_importQueue.length} saved spot${_importQueue.length > 1 ? "s" : ""} to import`);
-      openDayPickerModal(_importQueue.shift());
-    }
-  }
-
-  // ─────────────────────────────────────────
-  // HOTEL CARD
+  // HOTEL CARD (Updated with Custom Modal)
   // ─────────────────────────────────────────
 
   function renderHotelCard() {
@@ -449,47 +467,27 @@ document.addEventListener("DOMContentLoaded", function() {
     if (!card) {
       card = document.createElement("div");
       card.id = "hotelCard";
-      card.style.cssText = `
-        background: linear-gradient(135deg, #0369a1 0%, #0ea5e9 100%);
-        border-radius: 12px; padding: 16px 18px; margin-bottom: 16px;
-        color: white;
-      `;
+      card.style.cssText = `background: linear-gradient(135deg, #0369a1 0%, #0ea5e9 100%); border-radius: 12px; padding: 16px 18px; margin-bottom: 16px; color: white; box-shadow: 0 4px 12px rgba(3,105,161,0.15);`;
       const sidebar = document.querySelector(".sidebar");
-      sidebar.insertBefore(card, sidebar.firstChild);
+      const datePicker = document.getElementById("datePickerContainer");
+      if (datePicker) sidebar.insertBefore(card, datePicker.nextSibling);
+      else sidebar.insertBefore(card, sidebar.firstChild);
     }
 
     if (!hotel) {
-      card.innerHTML = `
-        <div style="font-size:0.75rem;font-weight:700;text-transform:uppercase;
-          letter-spacing:0.08em;opacity:0.8;margin-bottom:6px;">🏨 Your Hotel</div>
-        <div style="font-size:0.85rem;opacity:0.7;">No hotel saved yet.</div>
-        <a href="destination.html" style="display:inline-block;margin-top:10px;
-          padding:5px 12px;background:rgba(255,255,255,0.2);border-radius:20px;
-          font-size:0.75rem;color:white;text-decoration:none;font-weight:600;">
-          + Find a Hotel →
-        </a>
-      `;
+      card.innerHTML = `<div style="font-size:0.75rem;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;opacity:0.8;margin-bottom:6px;">🏨 Your Hotel</div><div style="font-size:0.85rem;opacity:0.8;">No hotel saved yet.</div><a href="destination.html" style="display:inline-block;margin-top:10px;padding:5px 12px;background:rgba(255,255,255,0.2);border-radius:20px;font-size:0.75rem;color:white;text-decoration:none;font-weight:600;">+ Find Hotel</a>`;
       return;
     }
 
-    card.innerHTML = `
-      <div style="font-size:0.75rem;font-weight:700;text-transform:uppercase;
-        letter-spacing:0.08em;opacity:0.8;margin-bottom:8px;">🏨 Your Hotel</div>
-      <div style="font-size:1rem;font-weight:700;margin-bottom:4px;">${hotel.name}</div>
-      <div style="font-size:0.82rem;opacity:0.85;">${hotel.price}</div>
-      <button onclick="clearHotel()" style="
-        margin-top:12px;padding:4px 10px;background:rgba(255,255,255,0.2);
-        border:1px solid rgba(255,255,255,0.3);border-radius:20px;
-        font-size:0.72rem;color:white;cursor:pointer;font-family:inherit;">
-        ✕ Remove
-      </button>
-    `;
+    card.innerHTML = `<div style="font-size:0.75rem;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;opacity:0.8;margin-bottom:8px;">🏨 Your Hotel</div><div style="font-size:1rem;font-weight:700;margin-bottom:4px;">${hotel.name}</div><div style="font-size:0.82rem;opacity:0.85;">${hotel.price}</div><button onclick="clearHotel()" style="margin-top:12px;padding:4px 10px;background:rgba(255,255,255,0.2);border:1px solid rgba(255,255,255,0.3);border-radius:20px;font-size:0.72rem;color:white;cursor:pointer;font-family:inherit;">✕ Remove</button>`;
   }
 
   window.clearHotel = function() {
-    if (!confirm("Remove saved hotel?")) return;
-    localStorage.removeItem("savedHotel");
-    renderHotelCard();
+    showConfirm("Remove this saved hotel?", () => {
+        localStorage.removeItem("savedHotel");
+        renderHotelCard();
+        showToast("Hotel removed", "warning");
+    });
   };
 
   // ─────────────────────────────────────────
@@ -505,177 +503,29 @@ document.addEventListener("DOMContentLoaded", function() {
   }
 
   // ─────────────────────────────────────────
-  // INIT
+  // MAP LOGIC
   // ─────────────────────────────────────────
-
-  loadSavedActivities();
-  render();
-  renderHotelCard();
-  setupChecklist();
-
-  document.getElementById("mapToggleBtn").addEventListener("click", function() {
-    window.toggleMap();
-  });
-
-  // ─────────────────────────────────────────
-  // MAP (UNCHANGED)
-  // ─────────────────────────────────────────
-
-  let mapInstance    = null;
+  
+  let mapInstance = null;
   let mapInitialised = false;
 
-  function haversine(lat1, lng1, lat2, lng2) {
-    const R = 6371, dLat = (lat2-lat1)*Math.PI/180, dLng = (lng2-lng1)*Math.PI/180;
-    const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLng/2)**2;
-    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-  }
-  function fmtDist(km) { return km < 1 ? `${Math.round(km*1000)}m` : `${km.toFixed(1)}km`; }
-  function walkTime(km) { const m=Math.round(km/0.083); return m<60?`${m}m walk`:`${Math.floor(m/60)}h ${m%60}m`; }
-  function driveTime(km) { const m=Math.round(km/0.5); return m<60?`${m}m drive`:`${Math.floor(m/60)}h ${m%60}m`; }
+  document.getElementById("mapToggleBtn").addEventListener("click", toggleMap);
+  window.toggleMap = function() { toggleMap(); }
 
-  function makePin(label, color, size) {
-    size = size || 34;
-    return L.divIcon({
-      className: "",
-      html: `<div style="width:${size}px;height:${size}px;border-radius:50% 50% 50% 0;
-        transform:rotate(-45deg);background:${color};border:3px solid white;
-        box-shadow:0 3px 10px rgba(0,0,0,0.25);display:flex;align-items:center;justify-content:center;">
-        <span style="transform:rotate(45deg);font-weight:700;color:white;
-          font-size:${Math.round(size*0.34)}px;font-family:sans-serif;">${label}</span>
-      </div>`,
-      iconSize:    [size, size],
-      iconAnchor:  [size/2, size],
-      popupAnchor: [0, -size]
-    });
-  }
-
-  async function geocodeAndRender(city) {
-    const days    = getDays();
-    const allActs = [];
-
-    days.forEach(day => {
-      day.activities.forEach(act => allActs.push({ text: act.text, time: act.time }));
-    });
-
-    if (allActs.length === 0) {
-      document.getElementById("tripMap").innerHTML =
-        `<div style="padding:40px;text-align:center;color:#94a3b8;">
-          <div style="font-size:2rem;margin-bottom:10px;">📍</div>
-          Add activities to your itinerary to see them on the map.
-        </div>`;
-      return;
-    }
-
-    document.getElementById("tripMap").innerHTML =
-      `<div style="padding:40px;text-align:center;color:#94a3b8;">
-        <div style="font-size:2rem;margin-bottom:10px;">⏳</div>
-        Locating your spots… (${allActs.length} activities, ~${allActs.length}s)
-      </div>`;
-
-    const geocoded = [];
-    for (const act of allActs) {
-      const cleanName = act.text.replace(/🏨\s?/, "").split(" (")[0].trim();
-      const isHotel   = act.text.startsWith("🏨");
-      try {
-        const url  = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(cleanName + (city ? " " + city : ""))}&format=json&limit=1`;
-        const res  = await fetch(url, { headers: { "Accept-Language": "en" } });
-        const data = await res.json();
-        if (data && data[0]) {
-          geocoded.push({
-            name:    cleanName,
-            lat:     parseFloat(data[0].lat),
-            lng:     parseFloat(data[0].lon),
-            isHotel, time: act.time
-          });
-        }
-      } catch (_) {}
-      await new Promise(r => setTimeout(r, 1100));
-    }
-
-    if (geocoded.length === 0) {
-      document.getElementById("tripMap").innerHTML =
-        `<div style="padding:40px;text-align:center;color:#94a3b8;">
-          <div style="font-size:2rem;margin-bottom:10px;">😕</div>
-          Couldn't find locations. Try including a city name in your activities.
-        </div>`;
-      return;
-    }
-
-    renderMap(geocoded);
-  }
-
-  function renderMap(points) {
-    if (mapInstance) { mapInstance.remove(); mapInstance = null; }
-
-    const mapDiv = document.getElementById("tripMap");
-    mapDiv.innerHTML = "";
-    mapDiv.style.height = "420px";
-
-    mapInstance = L.map("tripMap").setView([points[0].lat, points[0].lng], 13);
-
-    L.tileLayer("https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png", {
-      attribution: "© OpenStreetMap © CARTO", maxZoom: 19
-    }).addTo(mapInstance);
-
-    L.control.zoom({ position: "topright" }).addTo(mapInstance);
-
-    const hotel = points.find(p => p.isHotel);
-    const spots  = points.filter(p => !p.isHotel);
-
-    if (hotel) {
-      spots.forEach(s => {
-        L.polyline([[hotel.lat, hotel.lng], [s.lat, s.lng]], {
-          color: "#00b4d8", weight: 2, opacity: 0.4, dashArray: "6,5"
-        }).addTo(mapInstance);
-      });
-    }
-
-    if (hotel) {
-      L.marker([hotel.lat, hotel.lng], { icon: makePin("H", "#2563eb", 40) })
-        .addTo(mapInstance)
-        .bindPopup(`
-          <div style="font-size:0.65rem;font-weight:700;color:#2563eb;text-transform:uppercase;margin-bottom:4px;">🏨 Hotel</div>
-          <div style="font-weight:700;font-size:0.9rem;">${hotel.name}</div>
-          <div style="font-size:0.75rem;color:#64748b;">Your base for the trip</div>
-        `);
-    }
-
-    spots.forEach((s, i) => {
-      const dist = hotel ? haversine(hotel.lat, hotel.lng, s.lat, s.lng) : null;
-      L.marker([s.lat, s.lng], { icon: makePin(i+1, "#00b4d8", 34) })
-        .addTo(mapInstance)
-        .bindPopup(`
-          <div style="font-size:0.65rem;font-weight:700;color:#00b4d8;text-transform:uppercase;margin-bottom:4px;">📍 Stop ${i+1}</div>
-          <div style="font-weight:700;font-size:0.9rem;margin-bottom:4px;">${s.name}</div>
-          ${s.time !== "Saved" ? `<div style="font-size:0.75rem;color:#64748b;">🕐 ${s.time}</div>` : ""}
-          ${dist ? `<div style="display:flex;gap:5px;margin-top:7px;flex-wrap:wrap;">
-            <span style="padding:2px 7px;border-radius:5px;font-size:0.68rem;font-weight:600;background:#f0f9ff;color:#0369a1;">${fmtDist(dist)}</span>
-            <span style="padding:2px 7px;border-radius:5px;font-size:0.68rem;font-weight:600;background:#f0fdf4;color:#15803d;">🚶 ${walkTime(dist)}</span>
-            <span style="padding:2px 7px;border-radius:5px;font-size:0.68rem;font-weight:600;background:#eff6ff;color:#1d4ed8;">🚗 ${driveTime(dist)}</span>
-          </div>` : ""}
-        `);
-    });
-
-    if (points.length > 1) mapInstance.fitBounds(points.map(p => [p.lat, p.lng]), { padding: [40, 40] });
-  }
-
-  window.toggleMap = function() {
+  function toggleMap() {
     const body = document.getElementById("mapBody");
     const btn  = document.getElementById("mapToggleBtn");
-
     if (body.style.display !== "none") {
       body.style.display = "none";
       btn.textContent = "Show Map";
       return;
     }
-
     body.style.display = "block";
     btn.textContent = "Hide Map";
-
     if (!mapInitialised) {
       mapInitialised = true;
       const cached = localStorage.getItem("lastSearchedCity") || "";
-      const city   = cached || prompt("Which city is your trip in? (helps pinpoint locations)", "") || "";
+      const city = cached || prompt("Which city is this trip for?", "") || "";
       if (city) localStorage.setItem("lastSearchedCity", city);
       geocodeAndRender(city);
     } else {
@@ -683,4 +533,76 @@ document.addEventListener("DOMContentLoaded", function() {
     }
   };
 
-}); // end DOMContentLoaded
+  async function geocodeAndRender(city) {
+    const days = getDays();
+    const allActs = [];
+    days.forEach(day => {
+      day.activities.forEach(act => allActs.push({ text: act.text, time: act.time }));
+    });
+
+    if (allActs.length === 0) {
+      document.getElementById("tripMap").innerHTML = `<div style="padding:40px;text-align:center;color:#94a3b8;">Add activities to see them on the map.</div>`;
+      return;
+    }
+
+    document.getElementById("tripMap").innerHTML = `<div style="padding:40px;text-align:center;color:#94a3b8;">Locating spots...</div>`;
+
+    const geocoded = [];
+    for (const act of allActs) {
+      const cleanName = act.text.replace(/🏨\s?/, "").split(" (")[0].trim();
+      const isHotel = act.text.startsWith("🏨");
+      try {
+        const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(cleanName + (city ? " " + city : ""))}&format=json&limit=1`;
+        const res = await fetch(url);
+        const data = await res.json();
+        if (data && data[0]) {
+          geocoded.push({ name: cleanName, lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon), isHotel, time: act.time });
+        }
+      } catch (_) {}
+      await new Promise(r => setTimeout(r, 1100));
+    }
+
+    if (geocoded.length === 0) {
+        document.getElementById("tripMap").innerHTML = `<div style="padding:40px;text-align:center;color:#94a3b8;">Couldn't find locations.</div>`;
+        return;
+    }
+    renderMap(geocoded);
+  }
+
+  function renderMap(points) {
+    if (mapInstance) { mapInstance.remove(); mapInstance = null; }
+    document.getElementById("tripMap").innerHTML = "";
+    mapInstance = L.map("tripMap");
+    L.tileLayer("https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png", { attribution: "© OpenStreetMap", maxZoom: 19 }).addTo(mapInstance);
+    L.control.zoom({ position: "topright" }).addTo(mapInstance);
+    const bounds = [];
+    points.forEach(p => {
+        L.marker([p.lat, p.lng]).addTo(mapInstance).bindPopup(`<b>${p.name}</b><br>${p.time}`);
+        bounds.push([p.lat, p.lng]);
+    });
+    if (bounds.length > 0) mapInstance.fitBounds(bounds, { padding: [50, 50] });
+  }
+
+  // ─────────────────────────────────────────
+  // INIT
+  // ─────────────────────────────────────────
+  
+  renderDatePicker();
+  renderHotelCard();
+  setupChecklist();
+
+  const savedDays = JSON.parse(localStorage.getItem("tripDays"));
+  if (!savedDays || savedDays.length === 0) {
+     const savedSpots = JSON.parse(localStorage.getItem("myTrip")) || [];
+     if (savedSpots.length > 0) {
+         const days = getDays(); 
+         if (days.length === 0) { 
+             days.push({ label: "Day 1", activities: [] });
+             localStorage.setItem("tripDays", JSON.stringify(days));
+         }
+     }
+  }
+
+  render();
+
+});
