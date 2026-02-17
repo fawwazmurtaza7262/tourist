@@ -76,20 +76,26 @@
 
 </div>
 
-<!-- Add Activity Modal -->
-<div class="modal-overlay" id="activityModal">
-    <div class="modal">
-        <h3>Add Activity</h3>
-        <label for="activityTime">Time</label>
-        <input type="text" id="activityTime" placeholder="e.g. 10:00 AM" />
-        <label for="activityName">Activity</label>
-        <input type="text" id="activityName" placeholder="e.g. Visit Old Jaffa" />
-        <div class="modal-actions">
-            <button class="modal-cancel" id="modalCancel">Cancel</button>
-            <button class="modal-confirm" id="modalConfirm">Add</button>
-        </div>
+<div id="activityModal" class="modal">
+    <div class="modal-content">
+      <h2>Add Activity</h2>
+  
+      <label for="activityDaySelect">Choose Day</label>
+      <select id="activityDaySelect" class="modal-input"></select>
+  
+      <label for="activityTime">Time</label>
+      <input id="activityTime" type="text" placeholder="e.g. 9:00 AM" class="modal-input">
+  
+      <label for="activityName">Activity</label>
+      <input id="activityName" type="text" placeholder="e.g. Visit Museum" class="modal-input">
+  
+      <div class="modal-actions">
+        <button id="modalCancel">Cancel</button>
+        <button id="modalConfirm">Add</button>
+      </div>
     </div>
-</div>
+  </div>
+  
 
 </body>
 </html>

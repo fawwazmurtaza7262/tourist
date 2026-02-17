@@ -44,7 +44,6 @@ let activeTab     = "attractions"; // "attractions" | "hotels"
 // --- Filter + Sort State ---
 let activeFilter = "All";
 let activeSort   = "default";
-let activeStars  = "All";
 
 // --- City → currency map ---
 const cityToCurrency = {
@@ -282,7 +281,7 @@ function switchTab(tab) {
 }
 
 
-// --- Apply Filter + Sort (Attractions) ---
+// --- Apply Filter + Sort ---
 function applyFilterSort(spots) {
   let filtered = [...spots];
 
@@ -304,7 +303,7 @@ function applyFilterSort(spots) {
 }
 
 
-// --- Filter Bar (Attractions) ---
+// --- Filter Bar ---
 function renderFilterBar(spots) {
   let bar = document.getElementById("filterBar");
   if (!bar) {
@@ -353,67 +352,10 @@ function renderFilterBar(spots) {
 }
 
 
-// --- Hotel Filter Bar (Stars + Sort) ---
-function renderHotelFilterBar(hotels) {
-  let bar = document.getElementById("hotelFilterBar");
-  if (!bar) {
-    bar = document.createElement("div");
-    bar.id = "hotelFilterBar";
-    bar.style.cssText = `
-      display:flex;
-      flex-wrap:wrap;
-      gap:12px;
-      align-items:center;
-      margin-bottom:20px;
-    `;
-    spotsGrid.before(bar);
-  }
-
-  bar.innerHTML = `
-    <label style="font-size:0.85rem;color:#555;">
-      Stars:
-      <select id="starsFilter" style="margin-left:6px;padding:7px 10px;border-radius:8px;border:1px solid #ccc;">
-        <option value="All" ${activeStars==="All"?"selected":""}>All</option>
-        <option value="5" ${activeStars==="5"?"selected":""}>⭐⭐⭐⭐⭐ (5)</option>
-        <option value="4" ${activeStars==="4"?"selected":""}>⭐⭐⭐⭐ (4)</option>
-        <option value="3" ${activeStars==="3"?"selected":""}>⭐⭐⭐ (3)</option>
-        <option value="2" ${activeStars==="2"?"selected":""}>⭐⭐ (2)</option>
-        <option value="1" ${activeStars==="1"?"selected":""}>⭐ (1)</option>
-      </select>
-    </label>
-
-    <label style="font-size:0.85rem;color:#555;">
-      Sort:
-      <select id="hotelSortFilter" style="margin-left:6px;padding:7px 10px;border-radius:8px;border:1px solid #ccc;">
-        <option value="default" ${activeSort==="default"?"selected":""}>Default</option>
-        <option value="rating" ${activeSort==="rating"?"selected":""}>Highest Rating</option>
-        <option value="priceLow" ${activeSort==="priceLow"?"selected":""}>Lowest Price</option>
-        <option value="priceHigh" ${activeSort==="priceHigh"?"selected":""}>Highest Price</option>
-        <option value="starsHigh" ${activeSort==="starsHigh"?"selected":""}>Most Stars</option>
-      </select>
-    </label>
-  `;
-
-  document.getElementById("starsFilter").addEventListener("change", (e) => {
-    activeStars = e.target.value;
-    renderHotels();
-  });
-
-  document.getElementById("hotelSortFilter").addEventListener("change", (e) => {
-    activeSort = e.target.value;
-    renderHotels();
-  });
-}
-
-
 // --- Render Attractions ---
 function renderAttractions() {
   spotsGrid.innerHTML = "";
   showOverBudget = false;
-
-  // remove hotel filter bar if switching tabs
-  const hotelBar = document.getElementById("hotelFilterBar");
-  if (hotelBar) hotelBar.remove();
 
   const uc        = currencySelect.value;
   const budgetUSD = totalBudgetInUSD();
@@ -528,43 +470,19 @@ function renderSpotCard(spot, dimmed) {
 function renderHotels() {
   spotsGrid.innerHTML = "";
 
-  // remove attractions filter bar if switching tabs
-  const attractionBar = document.getElementById("filterBar");
-  if (attractionBar) attractionBar.remove();
-
-  renderHotelFilterBar(lastHotels);
-
   const uc = currencySelect.value;
   const lc = localCurrency;
   const days = parseInt(daysRange.value);
   const nightlyBudgetUSD = perNightBudgetInUSD();
 
-  let filteredHotels = [...lastHotels];
-
-  // stars filter
-  if (activeStars !== "All") {
-    filteredHotels = filteredHotels.filter(h => String(h.stars || 3) === activeStars);
-  }
-
-  // sorting
-  if (activeSort === "rating") {
-    filteredHotels.sort((a, b) => (b.rating || 0) - (a.rating || 0));
-  } else if (activeSort === "priceLow") {
-    filteredHotels.sort((a, b) => (a.price_per_night || 0) - (b.price_per_night || 0));
-  } else if (activeSort === "priceHigh") {
-    filteredHotels.sort((a, b) => (b.price_per_night || 0) - (a.price_per_night || 0));
-  } else if (activeSort === "starsHigh") {
-    filteredHotels.sort((a, b) => (b.stars || 0) - (a.stars || 0));
-  }
-
-  const affordable = filteredHotels.filter(h => h.price_per_night <= nightlyBudgetUSD);
-  const tooExp     = filteredHotels.filter(h => h.price_per_night > nightlyBudgetUSD);
+  const affordable = lastHotels.filter(h => h.price_per_night <= nightlyBudgetUSD);
+  const tooExp     = lastHotels.filter(h => h.price_per_night > nightlyBudgetUSD);
 
   const nightlyUser = toUserCurrency(nightlyBudgetUSD);
 
-  resultsCount.textContent = `${filteredHotels.length} hotels found · ${affordable.length} fit your nightly budget (${sym(uc)}${fmt(nightlyUser)}/night)`;
+  resultsCount.textContent = `${lastHotels.length} hotels found · ${affordable.length} fit your nightly budget (${sym(uc)}${fmt(nightlyUser)}/night)`;
 
-  if (affordable.length === 0 && filteredHotels.length > 0) {
+  if (affordable.length === 0 && lastHotels.length > 0) {
     const msg = document.createElement("div");
     msg.style.cssText = "grid-column:1/-1; text-align:center; padding:30px; color:#666;";
     msg.innerHTML = `<p>😅 No hotels fit your nightly budget. Try a higher budget or fewer days.</p>`;
@@ -604,7 +522,7 @@ function renderHotels() {
           data-name="${hotel.name}"
           data-price="${sym(uc)}${fmt(nightlyUser)}/night"
           ${dimmed ? 'style="background:#ccc;"' : ""}>
-          + Add to Itinerary
+          + Save Hotel
         </button>
       </div>`;
     spotsGrid.appendChild(card);
@@ -623,32 +541,28 @@ function renderHotels() {
 }
 
 
-// --- Add hotel to itinerary ---
+// --- Add hotel to trip ---
 window.addHotelToTrip = function(button) {
   const name  = button.getAttribute("data-name");
   const price = button.getAttribute("data-price");
   const trip  = JSON.parse(localStorage.getItem("myTrip")) || [];
 
-  if (trip.some(s => s.name === name)) {
-    button.textContent = "Already added!";
+  if (trip.some(s => s.name === `🏨 ${name}`)) {
+    button.textContent = "Already saved!";
     button.style.backgroundColor = "#f59e0b";
-    setTimeout(() => {
-      button.textContent = "✓ Added!";
-      button.style.backgroundColor = "#2ecc71";
-    }, 1500);
     return;
   }
 
   trip.push({ name: `🏨 ${name}`, price });
   localStorage.setItem("myTrip", JSON.stringify(trip));
 
-  button.textContent = "✓ Added!";
+  button.textContent = "✓ Saved!";
   button.style.backgroundColor = "#2ecc71";
   button.disabled = true;
 };
 
 
-// --- Add attraction to itinerary ---
+// --- Add attraction to trip ---
 window.addToItinerary = function(button) {
   const name  = button.getAttribute("data-name");
   const price = button.getAttribute("data-price");
@@ -657,10 +571,6 @@ window.addToItinerary = function(button) {
   if (trip.some(s => s.name === name)) {
     button.textContent = "Already added!";
     button.style.backgroundColor = "#f59e0b";
-    setTimeout(() => {
-      button.textContent = "✓ Added!";
-      button.style.backgroundColor = "#2ecc71";
-    }, 1500);
     return;
   }
 
@@ -787,9 +697,6 @@ Keep each desc under 15 words. Compact format required.
 
     lastHotels = safeParseArray(text);
 
-    activeStars = "All";
-    activeSort  = "default";
-
     renderTabs();
     renderHotels();
 
@@ -806,6 +713,9 @@ discoverBtn.addEventListener("click", () => {
   const rawCity = cityInput.value.trim();
   if (!rawCity) { alert("Please enter a city!"); return; }
 
+  // IMPORTANT: store selected days so plan page can build days
+  localStorage.setItem("selectedDays", daysRange.value);
+
   saveToHistory(rawCity);
 
   localCityName = rawCity;
@@ -817,7 +727,6 @@ discoverBtn.addEventListener("click", () => {
 
   activeFilter = "All";
   activeSort   = "default";
-  activeStars  = "All";
 
   resultsSection.style.display = "block";
   resultsTitle.textContent  = `Best Spots in ${rawCity}`;
@@ -837,6 +746,10 @@ discoverBtn.addEventListener("click", () => {
 daysRange.addEventListener("input", e => {
   daysValue.textContent = e.target.value;
   daysText.textContent  = e.target.value === "1" ? "1 day" : `${e.target.value} days`;
+
+  // IMPORTANT: save selected days immediately
+  localStorage.setItem("selectedDays", e.target.value);
+
   updateBudgetDisplay();
 });
 
