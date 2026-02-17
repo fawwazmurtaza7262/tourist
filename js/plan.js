@@ -17,16 +17,22 @@ document.addEventListener("DOMContentLoaded", function() {
   }
 
   function getDays() {
+    // 1. Get saved days
     const saved = JSON.parse(localStorage.getItem("tripDays"));
-    const startDateRaw = getStartDate();
-    let startDate = startDateRaw ? new Date(startDateRaw + "T00:00:00") : null;
-
+    
+    // 2. Determine how many days needed
     let totalDays = 0;
-    if (saved && saved.length > 0) {
+
+    // FIX: Check if 'saved' is not null. If it's an empty array [], we respect that (0 days).
+    if (saved !== null) {
         totalDays = saved.length;
     } else {
+        // Only fall back to default "selectedDays" if we have NEVER saved anything (null)
         totalDays = parseInt(localStorage.getItem("selectedDays")) || 1;
     }
+
+    const startDateRaw = getStartDate();
+    let startDate = startDateRaw ? new Date(startDateRaw + "T00:00:00") : null;
 
     const days = [];
     for (let i = 0; i < totalDays; i++) {
@@ -40,6 +46,7 @@ document.addEventListener("DOMContentLoaded", function() {
         subLabel = `Day ${i + 1}`;
       }
 
+      // Preserve existing activities if available
       const existingActs = (saved && saved[i]) ? saved[i].activities : [];
       
       days.push({ 
@@ -49,7 +56,11 @@ document.addEventListener("DOMContentLoaded", function() {
       });
     }
 
-    localStorage.setItem("tripDays", JSON.stringify(days));
+    // Only save if we actually generated default days (to persist the defaults)
+    if (saved === null && days.length > 0) {
+        localStorage.setItem("tripDays", JSON.stringify(days));
+    }
+    
     return days;
   }
 
@@ -73,13 +84,12 @@ document.addEventListener("DOMContentLoaded", function() {
   }
 
   // ─────────────────────────────────────────
-  // CUSTOM CONFIRM MODAL (Replaces Browser Alert)
+  // CUSTOM CONFIRM MODAL
   // ─────────────────────────────────────────
 
   function createConfirmModal() {
     if (document.getElementById("confirmModal")) return;
 
-    // 1. Inject Styles dynamically
     const style = document.createElement("style");
     style.innerHTML = `
       #confirmModal {
@@ -102,7 +112,6 @@ document.addEventListener("DOMContentLoaded", function() {
     `;
     document.head.appendChild(style);
 
-    // 2. Inject HTML
     const modal = document.createElement("div");
     modal.id = "confirmModal";
     modal.innerHTML = `
@@ -118,7 +127,6 @@ document.addEventListener("DOMContentLoaded", function() {
     `;
     document.body.appendChild(modal);
 
-    // 3. Close Logic
     modal.addEventListener("click", (e) => {
       if (e.target === modal) closeConfirm();
     });
@@ -128,8 +136,7 @@ document.addEventListener("DOMContentLoaded", function() {
   let _confirmCallback = null;
 
   function showConfirm(message, onYes) {
-    createConfirmModal(); // Ensure it exists
-    
+    createConfirmModal();
     const modal = document.getElementById("confirmModal");
     const text = document.getElementById("confirmText");
     const okBtn = document.getElementById("confirmOkBtn");
@@ -137,7 +144,6 @@ document.addEventListener("DOMContentLoaded", function() {
     text.textContent = message;
     _confirmCallback = onYes;
 
-    // Clone button to remove old listeners (avoids duplicate actions)
     const newOk = okBtn.cloneNode(true);
     okBtn.parentNode.replaceChild(newOk, okBtn);
     
@@ -201,12 +207,28 @@ document.addEventListener("DOMContentLoaded", function() {
   // ─────────────────────────────────────────
 
   function render() {
+    // getDays() will now correctly return [] if you deleted everything
     const days = getDays();
     const container = document.getElementById("daysContainer");
     container.innerHTML = "";
 
     if (days.length === 0) {
-      container.innerHTML = `<p class="empty-state">No days yet. Click "+ Add Day" to get started.</p>`;
+      container.innerHTML = `<div class="empty-state" style="padding:40px; text-align:center;">
+        <div style="font-size:3rem; margin-bottom:10px; opacity:0.3;">🗓️</div>
+        <p>No days yet.</p>
+        <button id="startEmptyBtn" style="
+            margin-top:10px; padding:8px 16px; background:#0ea5e9; color:white; 
+            border:none; border-radius:6px; cursor:pointer; font-weight:600;">
+            + Add Day 1
+        </button>
+      </div>`;
+      
+      // Allow adding the first day back
+      document.getElementById("startEmptyBtn").addEventListener("click", () => {
+          days.push({ label: "Day 1", activities: [] });
+          saveDays(days);
+          render();
+      });
       return;
     }
 
@@ -255,7 +277,6 @@ document.addEventListener("DOMContentLoaded", function() {
       container.appendChild(card);
     });
 
-    // Delete Activity
     container.querySelectorAll(".delete-btn").forEach(btn => {
       btn.addEventListener("click", () => {
         const days = getDays();
@@ -265,14 +286,13 @@ document.addEventListener("DOMContentLoaded", function() {
       });
     });
 
-    // Remove Day (Updated to use Custom Modal)
     container.querySelectorAll(".delete-day-btn").forEach(btn => {
       btn.addEventListener("click", () => {
         const dayLabel = getDays()[btn.dataset.day].label;
         showConfirm(`Remove ${dayLabel} and its activities?`, () => {
             const days = getDays();
             days.splice(Number(btn.dataset.day), 1);
-            saveDays(days);
+            saveDays(days); // This now saves [] properly
             render();
             showToast("Day removed", "warning");
         });
@@ -434,7 +454,7 @@ document.addEventListener("DOMContentLoaded", function() {
   });
 
   // ─────────────────────────────────────────
-  // ADD DAY & CLEAR (Updated with Custom Modal)
+  // ADD DAY & CLEAR (FIXED)
   // ─────────────────────────────────────────
 
   document.getElementById("addDayBtn").addEventListener("click", () => {
@@ -446,9 +466,12 @@ document.addEventListener("DOMContentLoaded", function() {
   });
 
   document.getElementById("clearAllBtn").addEventListener("click", () => {
-    // ⬇️ REPLACED browser confirm() with showConfirm()
     showConfirm("Clear all days and activities? This cannot be undone.", () => {
-        localStorage.removeItem("tripDays");
+        // FIX: Explicitly save an empty array []
+        // This tells getDays() "We have data, and the data is EMPTY".
+        // It prevents the fallback logic from regenerating the default 3 days.
+        localStorage.setItem("tripDays", "[]"); 
+        
         localStorage.removeItem("tripStartDate");
         document.getElementById("tripStartInput").value = "";
         render();
@@ -457,7 +480,7 @@ document.addEventListener("DOMContentLoaded", function() {
   });
 
   // ─────────────────────────────────────────
-  // HOTEL CARD (Updated with Custom Modal)
+  // HOTEL CARD
   // ─────────────────────────────────────────
 
   function renderHotelCard() {
@@ -584,19 +607,24 @@ document.addEventListener("DOMContentLoaded", function() {
   }
 
   // ─────────────────────────────────────────
-  // INIT
+  // INIT (FIXED)
   // ─────────────────────────────────────────
   
   renderDatePicker();
   renderHotelCard();
   setupChecklist();
 
+  // FIX: Initialization Logic
+  // Only auto-generate defaults if tripDays is STRICTLY null (never visited).
+  // If it's [] (user cleared it), we respect that and do NOT regenerate.
   const savedDays = JSON.parse(localStorage.getItem("tripDays"));
-  if (!savedDays || savedDays.length === 0) {
+  
+  if (savedDays === null) {
      const savedSpots = JSON.parse(localStorage.getItem("myTrip")) || [];
      if (savedSpots.length > 0) {
          const days = getDays(); 
          if (days.length === 0) { 
+             // Auto-create Day 1 only for first-time visitors with saved spots
              days.push({ label: "Day 1", activities: [] });
              localStorage.setItem("tripDays", JSON.stringify(days));
          }
