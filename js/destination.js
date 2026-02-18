@@ -713,8 +713,8 @@ discoverBtn.addEventListener("click", () => {
   const rawCity = cityInput.value.trim();
   if (!rawCity) { alert("Please enter a city!"); return; }
 
-  // IMPORTANT: store selected days so plan page can build days
   localStorage.setItem("selectedDays", daysRange.value);
+  localStorage.setItem("tripBudget", budgetRange.value);
 
   saveToHistory(rawCity);
 
