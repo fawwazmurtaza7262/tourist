@@ -14,6 +14,7 @@ document.addEventListener("DOMContentLoaded", function() {
   }
 
   function getBudget() {
+    // Reads the budget saved from destination.html
     return parseFloat(localStorage.getItem("tripBudget")) || 0;
   }
 
@@ -84,7 +85,7 @@ document.addEventListener("DOMContentLoaded", function() {
     if (document.getElementById("confirmModal")) return;
 
     const style = document.createElement("style");
-    // FIX: Increased z-index from 2000 to 10000 to ensure it's on top of the Activity Modal
+    // High Z-Index to stay on top of Activity Modal
     style.innerHTML = `
       #confirmModal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); display: none; align-items: center; justify-content: center; z-index: 10000; opacity: 0; transition: opacity 0.2s ease; }
       #confirmModal.open { display: flex; opacity: 1; }
@@ -215,7 +216,9 @@ document.addEventListener("DOMContentLoaded", function() {
     document.getElementById("editBudgetBtn").addEventListener("click", () => {
         const newBudget = prompt("Enter your total trip budget ($):", budget);
         if (newBudget !== null) {
-            setBudget(parseFloat(newBudget.replace(/[^0-9.]/g, "")) || 0);
+            // Strip out '$' or ',' if user types them
+            const cleanBudget = parseFloat(newBudget.replace(/[^0-9.]/g, "")) || 0;
+            setBudget(cleanBudget);
             renderBudgetTracker();
         }
     });
@@ -430,10 +433,13 @@ document.addEventListener("DOMContentLoaded", function() {
       const text = document.createElement("span");
       text.textContent = spot.name;
       
+      // AUTO-FILL NAME & COST
       text.onclick = () => { 
           inputElement.value = spot.name; 
+          
+          // Logic: If saved spot has price like "$25", we extract "25"
           if (spot.price) {
-              const nums = spot.price.replace(/[^0-9.]/g, "");
+              const nums = spot.price.toString().replace(/[^0-9.]/g, "");
               const costInput = document.getElementById("activityCost");
               if (costInput && nums) costInput.value = nums;
           }
