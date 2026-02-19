@@ -14,7 +14,6 @@ document.addEventListener("DOMContentLoaded", function() {
   }
 
   function getBudget() {
-    // Reads the budget saved from destination.html
     return parseFloat(localStorage.getItem("tripBudget")) || 0;
   }
 
@@ -85,7 +84,6 @@ document.addEventListener("DOMContentLoaded", function() {
     if (document.getElementById("confirmModal")) return;
 
     const style = document.createElement("style");
-    // High Z-Index to stay on top of Activity Modal
     style.innerHTML = `
       #confirmModal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); display: none; align-items: center; justify-content: center; z-index: 10000; opacity: 0; transition: opacity 0.2s ease; }
       #confirmModal.open { display: flex; opacity: 1; }
@@ -216,7 +214,6 @@ document.addEventListener("DOMContentLoaded", function() {
     document.getElementById("editBudgetBtn").addEventListener("click", () => {
         const newBudget = prompt("Enter your total trip budget ($):", budget);
         if (newBudget !== null) {
-            // Strip out '$' or ',' if user types them
             const cleanBudget = parseFloat(newBudget.replace(/[^0-9.]/g, "")) || 0;
             setBudget(cleanBudget);
             renderBudgetTracker();
@@ -433,16 +430,24 @@ document.addEventListener("DOMContentLoaded", function() {
       const text = document.createElement("span");
       text.textContent = spot.name;
       
-      // AUTO-FILL NAME & COST
+      // ⬇️ UPDATED: Remove from saved list when clicked to fill
       text.onclick = () => { 
+          // 1. Fill inputs
           inputElement.value = spot.name; 
           
-          // Logic: If saved spot has price like "$25", we extract "25"
           if (spot.price) {
               const nums = spot.price.toString().replace(/[^0-9.]/g, "");
               const costInput = document.getElementById("activityCost");
               if (costInput && nums) costInput.value = nums;
           }
+          
+          // 2. Remove from saved list immediately
+          saved.splice(index, 1);
+          localStorage.setItem("myTrip", JSON.stringify(saved));
+          
+          // 3. Re-render to show it's gone from the queue
+          renderSavedSuggestions(inputElement);
+          
           inputElement.focus(); 
       };
 
@@ -555,28 +560,51 @@ document.addEventListener("DOMContentLoaded", function() {
     });
   }
 
-  let mapInstance = null, mapInitialised = false;
-  document.getElementById("mapToggleBtn").addEventListener("click", toggleMap);
-  window.toggleMap = function() {
-    const body = document.getElementById("mapBody");
-    const btn  = document.getElementById("mapToggleBtn");
-    if (body.style.display !== "none") { body.style.display = "none"; btn.textContent = "Show Map"; return; }
-    body.style.display = "block"; btn.textContent = "Hide Map";
-    if (!mapInitialised) {
-      mapInitialised = true;
-      const cached = localStorage.getItem("lastSearchedCity") || "";
-      const city = cached || prompt("Which city is this trip for?", "") || "";
-      if (city) localStorage.setItem("lastSearchedCity", city);
-      geocodeAndRender(city);
-    } else { if (mapInstance) setTimeout(() => mapInstance.invalidateSize(), 100); }
-  };
+  // ─────────────────────────────────────────
+  // MAP LOGIC (FORCE VISIBLE - REMOVE TOGGLE BUTTON)
+  // ─────────────────────────────────────────
+
+  const toggleBtn = document.getElementById("mapToggleBtn");
+  if (toggleBtn) toggleBtn.remove(); // DELETE ELEMENT
+
+  const mapBody = document.getElementById("mapBody");
+  if (mapBody) {
+      mapBody.style.display = "block"; // FORCE SHOW
+      const mapDiv = document.getElementById("tripMap");
+      if (mapDiv) mapDiv.style.height = "420px";
+  }
+
+  let mapInstance = null;
+  setTimeout(autoInitMap, 500);
+
+  function autoInitMap() {
+    const cached = localStorage.getItem("lastSearchedCity") || "";
+    const days = getDays();
+    let hasActs = false;
+    days.forEach(d => { if(d.activities.length > 0) hasActs = true; });
+
+    let city = cached;
+    if (hasActs && !city) {
+         city = prompt("Which city is this trip for? (for map)", "") || "";
+         if (city) localStorage.setItem("lastSearchedCity", city);
+    }
+    
+    geocodeAndRender(city);
+  }
 
   async function geocodeAndRender(city) {
     const days = getDays();
     const allActs = [];
     days.forEach(day => day.activities.forEach(act => allActs.push({ text: act.text, time: act.time })));
-    if (allActs.length === 0) { document.getElementById("tripMap").innerHTML = `<div style="padding:40px;text-align:center;color:#94a3b8;">Add activities to see them on the map.</div>`; return; }
-    document.getElementById("tripMap").innerHTML = `<div style="padding:40px;text-align:center;color:#94a3b8;">Locating spots...</div>`;
+    
+    const mapDiv = document.getElementById("tripMap");
+    if (allActs.length === 0) { 
+        mapDiv.innerHTML = `<div style="padding:40px;text-align:center;color:#94a3b8;background:#f8fafc;height:100%;display:flex;align-items:center;justify-content:center;">Add activities to see them on the map.</div>`; 
+        return; 
+    }
+    
+    mapDiv.innerHTML = `<div style="padding:40px;text-align:center;color:#94a3b8;background:#f8fafc;height:100%;display:flex;align-items:center;justify-content:center;">Locating spots...</div>`;
+    
     const geocoded = [];
     for (const act of allActs) {
       const cleanName = act.text.replace(/🏨\s?/, "").split(" (")[0].trim();
@@ -593,13 +621,22 @@ document.addEventListener("DOMContentLoaded", function() {
 
   function renderMap(points) {
     if (mapInstance) { mapInstance.remove(); mapInstance = null; }
-    document.getElementById("tripMap").innerHTML = "";
+    
+    const mapDiv = document.getElementById("tripMap");
+    mapDiv.innerHTML = "";
+    
     mapInstance = L.map("tripMap");
     L.tileLayer("https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png", { attribution: "© OpenStreetMap", maxZoom: 19 }).addTo(mapInstance);
     L.control.zoom({ position: "topright" }).addTo(mapInstance);
+    
     const bounds = [];
-    points.forEach(p => { L.marker([p.lat, p.lng]).addTo(mapInstance).bindPopup(`<b>${p.name}</b><br>${p.time}`); bounds.push([p.lat, p.lng]); });
+    points.forEach(p => { 
+        L.marker([p.lat, p.lng]).addTo(mapInstance).bindPopup(`<b>${p.name}</b><br>${p.time}`); 
+        bounds.push([p.lat, p.lng]); 
+    });
+    
     if (bounds.length > 0) mapInstance.fitBounds(bounds, { padding: [50, 50] });
+    else if (points.length === 0) mapInstance.setView([0, 0], 2); 
   }
 
   const savedDays = JSON.parse(localStorage.getItem("tripDays"));
