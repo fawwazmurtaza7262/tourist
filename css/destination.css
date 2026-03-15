@@ -1,391 +1,219 @@
-/* =========================================
-   1. GLOBAL & NAVIGATION
-   ========================================= */
-   body {
-    font-family: sans-serif;
-    margin: 0;
-    padding: 0;
-    background-color: #f8f9fa;
-  }
-  
-  .nav {
-    display: flex;
-    justify-content: center;
-    gap: 30px;
-    padding: 20px 0;
-    background: white;
-    box-shadow: 0 2px 10px rgba(0,0,0,0.05);
-  }
-  
-  .nav-link {
-    text-decoration: none;
-    color: #333;
-    font-weight: 500;
-  }
-  
-  .nav-link:hover {
-    text-decoration: underline;
-  }
-  
-  /* =========================================
-     2. PAGE HEADER
-     ========================================= */
-  .page-title {
-    text-align: center;
-    padding: 40px 20px;
-    background: linear-gradient(90deg, #00c6ff, #f25f3a);
-    color: white;
-    margin-bottom: 0; /* Connected to search container */
-  }
-  
-  .page-title h2 {
-    font-size: 2.8rem;
-    margin: 0 0 10px 0;
-  }
-  
-  .page-title p {
-    color: rgba(255, 255, 255, 0.9);
-    font-size: 1.1rem;
-  }
-  
-  /* =========================================
-     3. SEARCH CONTAINER (The Input Box)
-     ========================================= */
-  .search-container {
-    display: flex;
-    justify-content: center;
-    padding: 0 20px 60px 20px; /* Padding bottom to separate from results */
-    background: linear-gradient(90deg, #00c6ff, #f25f3a); /* Continues header bg */
-  }
-  
-  .search-card {
-    background: white;
-    width: 100%;
-    max-width: 800px;
-    padding: 40px;
-    border-radius: 20px;
-    box-shadow: 0 15px 35px rgba(0, 0, 0, 0.1);
-    margin-top: -20px; /* Slight overlap effect */
-  }
-  
-  /* Grid Layout for Inputs */
-  .input-group {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 40px;
-    margin-bottom: 30px;
-    text-align: left;
-  }
-  
-  .field label {
-    display: block;
-    font-weight: 700;
-    color: #333;
-    margin-bottom: 12px;
-    font-size: 0.95rem;
-  }
-  
-  .icon {
-    margin-right: 5px;
-  }
-  
-  /* Input Fields */
-  .field input[type="text"], 
-  .field select {
-    width: 100%;
-    padding: 15px;
-    border: 1px solid #e0e6ed;
-    border-radius: 12px;
-    font-size: 1rem;
-    outline: none;
-    background-color: #fff;
-    box-sizing: border-box; /* Ensures padding doesn't break width */
-  }
-  
-  /* Slider Styling */
-  .slider-container {
-    display: flex;
-    align-items: center;
-    gap: 15px;
-  }
-  
-  .slider {
-    flex-grow: 1;
-    appearance: none;
-    height: 6px;
-    background: #eee;
-    border-radius: 5px;
-    outline: none;
-  }
-  
-  .slider::-webkit-slider-thumb {
-    appearance: none;
-    width: 18px;
-    height: 18px;
-    background: #56b8e6;
-    border-radius: 50%;
-    cursor: pointer;
-  }
-  
-  .slider-value {
-    color: #56b8e6;
-    font-weight: bold;
-    font-size: 1.1rem;
-    min-width: 50px;
-    text-align: right;
-  }
-  
-  .helper-text {
-    display: block;
-    color: #888;
-    margin-top: 8px;
-    font-size: 0.85rem;
-  }
-  
-  /* Discover Button */
-  .discover-btn {
-    width: 100%;
-    padding: 18px;
-    color: white;
-    border: none;
-    border-radius: 12px;
-    font-size: 1.1rem;
-    font-weight: 600;
-    background-color: #adddec; /* The default light blue */
-    background-color: #8FD6E8; /* Lighter blue */
-    transition: background-color 0.3s ease;
-    cursor: not-allowed; /* Shows it's not ready yet */
-
-  }
-
-  /* Active State (Text Entered) - Bright Blue */
-.discover-btn.active {
-  background-color: #4FC3F7; /* Bright "Twitter" Blue */
-  cursor: pointer;
-  box-shadow: 0 4px 10px rgba(79, 195, 247, 0.4); /* Nice glow effect */
-}
-  
-  .discover-btn:hover {
-    background-color: #29B6F6; /* Slightly darker on hover */
-    transform: translateY(-2px);
-  }
-
-  /* The style when the button is "ready" (has text in the input) */
-.discover-btn.ready {
-  background-color: #00b4d8; /* A bright, distinct blue */
-}
-  
-  /* Responsive Search */
-  @media (max-width: 700px) {
-    .input-group {
-      grid-template-columns: 1fr;
-      gap: 20px;
-    }
-  }
-  
-  /* =========================================
-     4. RESULTS SECTION (The New Part)
-     ========================================= */
-  .results-container {
-    max-width: 1000px;
-    margin: 0 auto;
-    padding: 60px 20px;
-  }
-  
-  .results-header h2 {
-    font-size: 2rem;
-    margin-bottom: 5px;
-    color: #2c3e50;
-  }
-  
-  .results-header p {
-    color: #7f8c8d;
-    margin-top: 0;
-  }
-  
-  /* Stats Row (Duration, Budget, Currency boxes) */
-  .stats-row {
-    display: flex;
-    gap: 15px;
-    margin: 25px 0 40px 0;
-    flex-wrap: wrap;
-  }
-  
-  .stat-card {
-    background: #e9ecef; /* Light gray background like screenshot */
-    padding: 12px 20px;
-    border-radius: 8px;
-    font-size: 0.85rem;
-    color: #7f8c8d;
-    font-weight: 600;
-    letter-spacing: 0.5px;
-    display: flex;
-    align-items: center;
-  }
-  
-  .stat-card strong {
-    color: #2c3e50;
-    font-size: 1rem;
-    margin-left: 8px;
-  }
-  
-  /* The Grid for Cards */
-  .spots-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-    gap: 30px;
-  }
-  
-  /* Individual Card Design */
-  .spot-card {
-    background: white;
-    border-radius: 16px;
-    overflow: hidden;
-    border: 1px solid #eee;
-    box-shadow: 0 10px 20px rgba(0,0,0,0.05);
-    display: flex;
-    flex-direction: column;
-    transition: transform 0.3s ease;
-  }
-  
-  .spot-card:hover {
-    transform: translateY(-5px);
-  }
-  
-  /* Card Gradient Header with Icon */
-  .card-header {
-    background: linear-gradient(to bottom, #e3f2fd, #ffffff);
-    padding: 30px 0;
-    text-align: center;
-    border-bottom: 1px solid #f0f0f0;
-  }
-  
-  .card-icon {
-    font-size: 3rem;
-    display: block;
-  }
-  
-  /* Card Body */
-  .card-body {
-    padding: 20px;
-    flex-grow: 1;
-    display: flex;
-    flex-direction: column;
-  }
-  
-  .card-body h3 {
-    margin: 0 0 5px 0;
-    font-size: 1.2rem;
-    color: #333;
-  }
-  
-  .rating {
-    font-size: 0.9rem;
-    color: #f39c12; /* Star color */
-    font-weight: bold;
-    margin-bottom: 10px;
-  }
-  
-  .card-body p {
-    color: #666;
-    font-size: 0.95rem;
-    line-height: 1.5;
-    margin-bottom: 20px;
-    flex-grow: 1;
-  }
-  
-  /* Price and Button Area */
-  .price-box {
-    background: #f8f9fa;
-    padding: 12px;
-    border-radius: 8px;
-    margin-bottom: 15px;
-    display: flex;
-    flex-direction: column;
-  }
-  
-  .price-box span {
-    font-size: 0.75rem;
-    color: #999;
-    font-weight: bold;
-    letter-spacing: 1px;
-  }
-  
-  .price-box strong {
-    font-size: 1.4rem;
-    margin-top: 2px;
-  }
-  
-  .learn-btn {
-    width: 100%;
-    padding: 12px;
-    background-color: #00b4d8; /* Bright Blue */
-    color: white;
-    border: none;
-    border-radius: 8px;
-    font-weight: bold;
-    cursor: pointer;
-    transition: background 0.2s;
-  }
-  
-  .learn-btn:hover {
-    background-color: #0096c7;
-  }
-
-  /* Loading State */
-.loading-container {
-  text-align: center;
-  padding: 40px;
-  color: #666;
-  font-size: 1.2rem;
+/* ===== DESTINATION PAGE ===== */
+:root {
+  --sand: #F5EFE0;
+  --sand-dark: #EDE3CC;
+  --terracotta: #C4623A;
+  --terracotta-dark: #A84E2C;
+  --ink: #1C1917;
+  --ink-light: #44403C;
+  --mist: #F8F4ED;
+  --white: #FFFFFF;
+  --font-display: 'Playfair Display', Georgia, serif;
+  --font-body: 'DM Sans', system-ui, sans-serif;
+  --radius-sm: 8px;
+  --radius-md: 16px;
+  --radius-lg: 24px;
 }
 
-.spinner {
-  border: 4px solid #f3f3f3;
-  border-top: 4px solid #00b4d8;
-  border-radius: 50%;
-  width: 40px;
-  height: 40px;
-  animation: spin 1s linear infinite;
-  margin: 0 auto 15px auto;
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: var(--font-body);
+  background: var(--mist);
+  color: var(--ink);
 }
 
-@keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
+/* NAV */
+.nav {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 60px;
+  background: var(--white);
+  border-bottom: 1px solid var(--sand-dark);
+  position: sticky;
+  top: 0;
+  z-index: 100;
 }
 
-/* ── Paste these into your destination.css, replacing any existing .input-group rules ── */
+.nav-brand {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 1.3rem;
+  color: var(--terracotta);
+  text-decoration: none;
+}
+
+.nav-links { display: flex; gap: 36px; }
+
+.nav-link {
+  text-decoration: none;
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: var(--ink-light);
+  padding-bottom: 3px;
+  border-bottom: 2px solid transparent;
+  transition: color 0.2s, border-color 0.2s;
+}
+
+.nav-link:hover, .nav-link.active {
+  color: var(--terracotta);
+  border-bottom-color: var(--terracotta);
+}
+
+/* PAGE HEADER */
+.page-title {
+  background: var(--sand);
+  padding: 60px 60px 0;
+  border-bottom: 1px solid var(--sand-dark);
+}
+
+.page-eyebrow {
+  font-size: 0.75rem;
+  font-weight: 500;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--terracotta);
+  margin-bottom: 12px;
+}
+
+.page-title h2 {
+  font-family: var(--font-display);
+  font-size: clamp(40px, 5vw, 64px);
+  font-weight: 900;
+  color: var(--ink);
+  letter-spacing: -0.03em;
+  line-height: 1;
+  margin-bottom: 0;
+}
+
+.page-subtitle {
+  font-size: 1rem;
+  color: var(--ink-light);
+  font-weight: 300;
+  margin-top: 14px;
+  padding-bottom: 40px;
+}
+
+/* SEARCH CARD */
+.search-container {
+  padding: 0 60px 60px;
+  background: var(--sand);
+}
 
 .search-card {
-  display: flex;
-  flex-direction: column;
-  gap: 0;
+  background: var(--white);
+  border-radius: var(--radius-lg);
+  padding: 40px 44px;
+  border: 1px solid var(--sand-dark);
+  box-shadow: 0 8px 32px rgba(28,25,23,0.06);
 }
 
-/* Single 2-column grid for all 4 fields */
 .fields-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 24px 32px;
-  margin-bottom: 24px;
-  align-items: start;
+  gap: 28px 40px;
+  margin-bottom: 32px;
 }
 
-/* Remove old input-group layout */
-.input-group {
-  display: contents; /* lets children flow into .fields-grid */
+.field label {
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-light);
+  margin-bottom: 10px;
 }
 
-#currencySelect {
+.icon { margin-right: 6px; }
+
+.field input[type="text"],
+.field select {
   width: 100%;
+  padding: 14px 16px;
+  border: 1.5px solid var(--sand-dark);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-body);
+  font-size: 0.95rem;
+  background: var(--mist);
+  color: var(--ink);
+  outline: none;
+  transition: border-color 0.2s;
 }
 
-#rateBadge {
+.field input[type="text"]:focus,
+.field select:focus {
+  border-color: var(--terracotta);
+}
+
+.slider-container {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.slider {
+  flex-grow: 1;
+  appearance: none;
+  height: 4px;
+  background: var(--sand-dark);
+  border-radius: 4px;
+  outline: none;
+}
+
+.slider::-webkit-slider-thumb {
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  background: var(--terracotta);
+  border-radius: 50%;
+  cursor: pointer;
+  transition: transform 0.15s;
+}
+
+.slider::-webkit-slider-thumb:hover { transform: scale(1.2); }
+
+.slider-value {
+  color: var(--terracotta);
+  font-weight: 600;
+  font-size: 0.95rem;
+  min-width: 52px;
+  text-align: right;
+}
+
+.helper-text {
+  display: block;
+  color: var(--ink-light);
   margin-top: 8px;
   font-size: 0.8rem;
-  color: #555;
-  line-height: 1.8;
+  opacity: 0.7;
+}
+
+.discover-btn {
+  width: 100%;
+  padding: 18px;
+  background: var(--sand-dark);
+  color: var(--ink-light);
+  border: none;
+  border-radius: var(--radius-sm);
+  font-family: var(--font-body);
+  font-size: 1rem;
+  font-weight: 500;
+  cursor: not-allowed;
+  transition: background 0.2s, color 0.2s, transform 0.15s;
+}
+
+.discover-btn.active {
+  background: var(--terracotta);
+  color: var(--white);
+  cursor: pointer;
+  box-shadow: 0 4px 16px rgba(196,98,58,0.3);
+}
+
+.discover-btn.active:hover {
+  background: var(--terracotta-dark);
+  transform: translateY(-1px);
 }
 
 #searchHistory {
@@ -396,8 +224,199 @@
   align-items: center;
 }
 
-@media (max-width: 640px) {
-  .fields-grid {
-    grid-template-columns: 1fr;
-  }
+#rateBadge {
+  margin-top: 8px;
+  font-size: 0.78rem;
+  color: var(--ink-light);
+}
+
+/* RESULTS */
+.results-container {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 60px 24px;
+}
+
+.results-header {
+  margin-bottom: 28px;
+}
+
+.results-header h2 {
+  font-family: var(--font-display);
+  font-size: 2rem;
+  font-weight: 700;
+  color: var(--ink);
+  letter-spacing: -0.02em;
+  margin-bottom: 4px;
+}
+
+.results-header p {
+  font-size: 0.9rem;
+  color: var(--ink-light);
+  font-weight: 300;
+}
+
+.stats-row {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 40px;
+  flex-wrap: wrap;
+}
+
+.stat-card {
+  background: var(--white);
+  border: 1px solid var(--sand-dark);
+  padding: 10px 18px;
+  border-radius: 100px;
+  font-size: 0.82rem;
+  color: var(--ink-light);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.stat-card strong {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.spots-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 24px;
+}
+
+.spot-card {
+  background: var(--white);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  border: 1px solid var(--sand-dark);
+  display: flex;
+  flex-direction: column;
+  transition: transform 0.25s, box-shadow 0.25s;
+}
+
+.spot-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 16px 40px rgba(28,25,23,0.1);
+}
+
+.card-header {
+  background: var(--sand);
+  padding: 36px 0;
+  text-align: center;
+  border-bottom: 1px solid var(--sand-dark);
+}
+
+.card-icon { font-size: 2.8rem; }
+
+.card-body {
+  padding: 22px;
+  flex-grow: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.card-body h3 {
+  font-family: var(--font-display);
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--ink);
+  margin-bottom: 4px;
+  letter-spacing: -0.01em;
+}
+
+.rating {
+  font-size: 0.82rem;
+  color: var(--accent, #D4924A);
+  font-weight: 600;
+  margin-bottom: 10px;
+}
+
+.card-body p {
+  font-size: 0.88rem;
+  color: var(--ink-light);
+  line-height: 1.6;
+  margin-bottom: 20px;
+  flex-grow: 1;
+  text-align: left;
+}
+
+.price-box {
+  background: var(--mist);
+  border: 1px solid var(--sand-dark);
+  padding: 12px 14px;
+  border-radius: var(--radius-sm);
+  margin-bottom: 14px;
+  display: flex;
+  flex-direction: column;
+}
+
+.price-box span {
+  font-size: 0.7rem;
+  color: var(--ink-light);
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.price-box strong {
+  font-size: 1.3rem;
+  font-weight: 700;
+  color: var(--ink);
+  margin-top: 2px;
+}
+
+.learn-btn {
+  width: 100%;
+  padding: 12px;
+  background: var(--terracotta);
+  color: var(--white);
+  border: none;
+  border-radius: var(--radius-sm);
+  font-family: var(--font-body);
+  font-weight: 500;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.learn-btn:hover { background: var(--terracotta-dark); }
+
+.loading-container {
+  text-align: center;
+  padding: 60px;
+  color: var(--ink-light);
+}
+
+.spinner {
+  border: 3px solid var(--sand-dark);
+  border-top: 3px solid var(--terracotta);
+  border-radius: 50%;
+  width: 36px;
+  height: 36px;
+  animation: spin 0.8s linear infinite;
+  margin: 0 auto 16px;
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* FOOTER */
+.footer {
+  background: var(--ink);
+  border-top: 1px solid rgba(255,255,255,0.06);
+  padding: 24px 60px;
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.82rem;
+  color: rgba(255,255,255,0.35);
+}
+
+/* RESPONSIVE */
+@media (max-width: 900px) {
+  .nav { padding: 16px 24px; }
+  .page-title { padding: 40px 24px 0; }
+  .search-container { padding: 0 24px 40px; }
+  .search-card { padding: 28px 24px; }
+  .fields-grid { grid-template-columns: 1fr; gap: 20px; }
 }
