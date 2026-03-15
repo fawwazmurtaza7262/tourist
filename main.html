@@ -1,74 +1,103 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <meta name="description" content="Tourist — find destinations, plan trips, and get local tips." />
-  <title>Tourist Planner</title>
-  <link rel="stylesheet" href="/css/style.css" />
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Tourist Planner</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;0,900;1,700&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/style.css" />
 </head>
 
 <body>
-  <h1 style="text-align: center;">Tourist Planner</h1>
 
-  <nav aria-label="Primary" class="nav">
-    <a href="main.html" class="nav-link">Home</a>
-    <a href="destination.html" class="nav-link">Destinations</a>
-    <a href="plan.html" class="nav-link">Plan Trip</a>
-  </nav>
-
- 
-    <section id="home" class="page">
-      <h2>Welcome to Tourist Planner</h2>
-      <p>This is a website that will help you plan your trip</p>
-    </section>
-
-    <section class="features-container">
-        <div class="feature-card">
-            <h3>Find Destinations</h3>
-            <p>Discover popular tourist spots around the world.</p>
-        </div>
-        <div class="feature-card">
-            <h3>Plan Your Trip</h3>
-            <p>Create itineraries and manage your travel plans.</p>
-        </div>
-
-        <div class="feature-card">
-            <h3>Get Local Tips</h3>
-            <p>Access insider information from locals to enhance your experience.</p>
-    </section>
-
-    <section class="how-it-works">
-        <h2>How It Works</h2>
-        <p class="subtile">Planning your next trip has never been so easy</p>
-        <div class="steps-container">
-            <div class="step-card">
-                <div class="step-number">1</div>
-                <h3>Search Destinations</h3>
-                <p>Use our search tool to find destinations that match your interests.</p>
-            </div>
-
-            <div class="step-card">
-                <div class="step-number">2</div>
-                <h3>2. Create Itinerary</h3>
-                <p>Select attractions and activities to build your personalized itinerary.</p>
-            </div>
-
-            <div class="step-card">
-                <div class="step-number">3</div>
-                <h3>3. Explore spots</h3>
-                <p>Get detailed information about the best attractions and spots tailored for you.</p>
-            </div>
-    </section>
-
-    <section class="cta-section">
-        <h2>Ready to explore?</h2>
-        <p>Start planning your trip today. Find the best spots within your budget </p>
-        <button>Begin your journey</button>
-    </section>
-
-    <footer class="footer">
-        <p>&copy; 2024 Tourist Planner. All rights reserved.</p>
+    <nav class="nav">
+      <a href="main.html" class="nav-brand">✈ Tourist</a>
+      <div class="nav-links">
+        <a href="main.html" class="nav-link active">Home</a>
+        <a href="destination.html" class="nav-link">Destinations</a>
+        <a href="plan.html" class="nav-link">Plan Trip</a>
+      </div>
+    </nav>
   
-</body>
-</html>
+    <section class="hero">
+      <div class="hero-eyebrow">Your world awaits</div>
+      <h1 class="hero-title">Travel<br><em>Further.</em></h1>
+      <p class="hero-sub">Discover destinations, build itineraries, and unlock local secrets — all in one place.</p>
+      <div class="hero-cta">
+        <a href="destination.html" class="btn-primary">Explore Destinations</a>
+        <a href="plan.html" class="btn-ghost">Plan a Trip</a>
+      </div>
+      <div class="hero-badge"><span>🌍</span><span>190+ countries</span></div>
+    </section>
+  
+    <section class="features-section">
+      <div class="features-label">What we offer</div>
+      <div class="features-container">
+        <div class="feature-card">
+          <div class="feature-icon">🗺</div>
+          <h3>Find Destinations</h3>
+          <p>Discover popular tourist spots around the world, filtered by your budget and timeline.</p>
+          <a href="destination.html" class="feature-link">Browse →</a>
+        </div>
+        <div class="feature-card feature-card--accent">
+          <div class="feature-icon">📅</div>
+          <h3>Plan Your Trip</h3>
+          <p>Build day-by-day itineraries, track activities, and keep your trip perfectly organised.</p>
+          <a href="plan.html" class="feature-link">Plan now →</a>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">💡</div>
+          <h3>Get Local Tips</h3>
+          <p>Access insider information from locals to enhance every moment of your experience.</p>
+          <a href="destination.html" class="feature-link">Discover →</a>
+        </div>
+      </div>
+    </section>
+  
+    <section class="how-it-works">
+      <div class="hiw-inner">
+        <div class="hiw-header">
+          <h2>Three steps to<br><em>your perfect trip</em></h2>
+          <p>Planning has never been this effortless.</p>
+        </div>
+        <div class="steps-container">
+          <div class="step-card">
+            <div class="step-number">01</div>
+            <h3>Search Destinations</h3>
+            <p>Use our search tool to find destinations that match your interests and budget.</p>
+          </div>
+          <div class="step-divider">—</div>
+          <div class="step-card">
+            <div class="step-number">02</div>
+            <h3>Create Itinerary</h3>
+            <p>Select attractions and activities to build your personalised day-by-day plan.</p>
+          </div>
+          <div class="step-divider">—</div>
+          <div class="step-card">
+            <div class="step-number">03</div>
+            <h3>Explore & Enjoy</h3>
+            <p>Get detailed info about the best spots and experiences tailored just for you.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+  
+    <section class="cta-section">
+      <div class="cta-inner">
+        <div class="cta-tag">Start for free</div>
+        <h2>Ready to<br>explore?</h2>
+        <p>Find the best spots within your budget. Your next adventure starts here.</p>
+        <a href="destination.html" class="btn-cta">Begin your journey</a>
+      </div>
+      <div class="cta-deco">✈</div>
+    </section>
+  
+    <footer class="footer">
+      <span>✈ Tourist Planner</span>
+      <span>© 2024 All rights reserved.</span>
+    </footer>
+  
+  </body>
+  </html>
