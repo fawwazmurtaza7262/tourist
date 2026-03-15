@@ -107,6 +107,8 @@ body {
   padding: 40px 44px;
   border: 1px solid var(--sand-dark);
   box-shadow: 0 8px 32px rgba(28,25,23,0.06);
+  max-width: 860px;
+  margin: 0 auto;
 }
 
 .fields-grid {
