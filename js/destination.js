@@ -39,7 +39,7 @@ let lastHotels    = [];
 let localCurrency = null;
 let localCityName = "";
 let showOverBudget = false;
-let activeTab     = "attractions"; // "attractions" | "hotels"
+let activeTab     = "attractions";
 
 // --- Filter + Sort State ---
 let activeFilter = "All";
@@ -310,11 +310,7 @@ function renderFilterBar(spots) {
     bar = document.createElement("div");
     bar.id = "filterBar";
     bar.style.cssText = `
-      display:flex;
-      flex-wrap:wrap;
-      gap:12px;
-      align-items:center;
-      margin-bottom:20px;
+      display:flex; flex-wrap:wrap; gap:12px; align-items:center; margin-bottom:20px;
     `;
     spotsGrid.before(bar);
   }
@@ -328,7 +324,6 @@ function renderFilterBar(spots) {
         ${types.map(t => `<option value="${t}" ${t===activeFilter?"selected":""}>${t}</option>`).join("")}
       </select>
     </label>
-
     <label style="font-size:0.85rem;color:#555;">
       Sort:
       <select id="sortFilter" style="margin-left:6px;padding:7px 10px;border-radius:8px;border:1px solid #ccc;">
@@ -409,11 +404,8 @@ function renderAttractions() {
 window.toggleOverBudget = function() {
   const section = document.getElementById("overBudgetSection");
   const btn     = document.querySelector("#overBudgetToggle button");
-
   showOverBudget = !showOverBudget;
-
   section.style.display = showOverBudget ? "block" : "none";
-
   btn.textContent = showOverBudget
     ? "Hide over-budget attractions ▴"
     : `Show ${section.querySelectorAll(".spot-card").length} attractions over budget ▾`;
@@ -479,7 +471,6 @@ function renderHotels() {
   const tooExp     = lastHotels.filter(h => h.price_per_night > nightlyBudgetUSD);
 
   const nightlyUser = toUserCurrency(nightlyBudgetUSD);
-
   resultsCount.textContent = `${lastHotels.length} hotels found · ${affordable.length} fit your nightly budget (${sym(uc)}${fmt(nightlyUser)}/night)`;
 
   if (affordable.length === 0 && lastHotels.length > 0) {
@@ -535,7 +526,6 @@ function renderHotels() {
     divider.style.cssText = "grid-column:1/-1; text-align:center; color:#aaa; font-size:0.85rem; padding:8px 0; border-top:1px dashed #ddd;";
     divider.textContent = `⬇️ ${tooExp.length} hotel${tooExp.length>1?"s":""} over your nightly budget`;
     spotsGrid.appendChild(divider);
-
     tooExp.forEach(h => renderHotelCard(h, true));
   }
 }
@@ -583,7 +573,7 @@ window.addToItinerary = function(button) {
 };
 
 
-// --- Robust JSON parser — handles Gemini truncation ---
+// --- Robust JSON parser ---
 function safeParseArray(text) {
   text = text.replace(/```json/gi, "").replace(/```/g, "").trim();
 
@@ -596,12 +586,10 @@ function safeParseArray(text) {
 
   for (let i = 0; i < text.length; i++) {
     const ch = text[i];
-
     if (escape) { escape = false; continue; }
     if (ch === "\\") { escape = true; continue; }
     if (ch === '"') { inString = !inString; continue; }
     if (inString) continue;
-
     if (ch === "{") depth++;
     if (ch === "}") {
       depth--;
@@ -649,7 +637,6 @@ Keep each desc under 15 words. Compact format required.
     text = text.replace(/```json/gi,"").replace(/```/g,"").trim();
 
     lastSpots = safeParseArray(text);
-
     activeFilter = "All";
     activeSort   = "default";
 
@@ -696,7 +683,6 @@ Keep each desc under 15 words. Compact format required.
     text = text.replace(/```json/gi,"").replace(/```/g,"").trim();
 
     lastHotels = safeParseArray(text);
-
     renderTabs();
     renderHotels();
 
@@ -715,16 +701,16 @@ discoverBtn.addEventListener("click", () => {
 
   localStorage.setItem("selectedDays", daysRange.value);
   localStorage.setItem("tripBudget", budgetRange.value);
+  localStorage.setItem("lastSearchedCity", rawCity); // ← THE FIX
 
   saveToHistory(rawCity);
 
   localCityName = rawCity;
   localCurrency = detectLocalCurrency(rawCity);
 
-  lastSpots     = [];
-  lastHotels    = [];
-  activeTab     = "attractions";
-
+  lastSpots  = [];
+  lastHotels = [];
+  activeTab  = "attractions";
   activeFilter = "All";
   activeSort   = "default";
 
@@ -737,7 +723,6 @@ discoverBtn.addEventListener("click", () => {
 
   updateRateBadge();
   fetchAttractions(rawCity);
-
   resultsSection.scrollIntoView({ behavior:"smooth" });
 });
 
@@ -746,10 +731,7 @@ discoverBtn.addEventListener("click", () => {
 daysRange.addEventListener("input", e => {
   daysValue.textContent = e.target.value;
   daysText.textContent  = e.target.value === "1" ? "1 day" : `${e.target.value} days`;
-
-  // IMPORTANT: save selected days immediately
   localStorage.setItem("selectedDays", e.target.value);
-
   updateBudgetDisplay();
 });
 

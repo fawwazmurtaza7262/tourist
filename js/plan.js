@@ -28,9 +28,9 @@ document.addEventListener("DOMContentLoaded", function() {
 
     let totalDays = 0;
     if (saved !== null) {
-        totalDays = saved.length;
+      totalDays = saved.length;
     } else {
-        totalDays = parseInt(localStorage.getItem("selectedDays")) || 1;
+      totalDays = parseInt(localStorage.getItem("selectedDays")) || 1;
     }
 
     const days = [];
@@ -46,18 +46,18 @@ document.addEventListener("DOMContentLoaded", function() {
       }
 
       const existingActs = (saved && saved[i]) ? saved[i].activities : [];
-      
-      days.push({ 
-        label: label, 
+
+      days.push({
+        label: label,
         subLabel: subLabel,
-        activities: existingActs 
+        activities: existingActs
       });
     }
 
     if (saved === null && days.length > 0) {
-        localStorage.setItem("tripDays", JSON.stringify(days));
+      localStorage.setItem("tripDays", JSON.stringify(days));
     }
-    
+
     return days;
   }
 
@@ -129,7 +129,7 @@ document.addEventListener("DOMContentLoaded", function() {
 
     const newOk = okBtn.cloneNode(true);
     okBtn.parentNode.replaceChild(newOk, okBtn);
-    
+
     newOk.addEventListener("click", () => {
       if (_confirmCallback) _confirmCallback();
       closeConfirm();
@@ -150,36 +150,36 @@ document.addEventListener("DOMContentLoaded", function() {
   function renderDatePicker() {
     let container = document.getElementById("datePickerContainer");
     if (!container) {
-        container = document.createElement("div");
-        container.id = "datePickerContainer";
-        container.style.cssText = `background: white; padding: 16px; border-radius: 12px; margin-bottom: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.05);`;
-        const sidebar = document.querySelector(".sidebar");
-        sidebar.insertBefore(container, sidebar.firstChild);
+      container = document.createElement("div");
+      container.id = "datePickerContainer";
+      container.style.cssText = `background: white; padding: 16px; border-radius: 12px; margin-bottom: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.05);`;
+      const sidebar = document.querySelector(".sidebar");
+      sidebar.insertBefore(container, sidebar.firstChild);
     }
     const savedDate = getStartDate() || "";
     container.innerHTML = `
-        <label style="display:block; font-size:0.75rem; font-weight:700; text-transform:uppercase; color:#94a3b8; margin-bottom:8px;">📅 Trip Start Date</label>
-        <input type="date" id="tripStartInput" value="${savedDate}" style="width: 100%; padding: 8px 10px; border: 1px solid #e2e8f0; border-radius: 6px; font-family: inherit; color: #334155; outline: none; transition: border 0.2s;">
+      <label style="display:block; font-size:0.75rem; font-weight:700; text-transform:uppercase; color:#94a3b8; margin-bottom:8px;">📅 Trip Start Date</label>
+      <input type="date" id="tripStartInput" value="${savedDate}" style="width: 100%; padding: 8px 10px; border: 1px solid #e2e8f0; border-radius: 6px; font-family: inherit; color: #334155; outline: none; transition: border 0.2s;">
     `;
     const input = document.getElementById("tripStartInput");
-    input.addEventListener("focus", () => input.style.borderColor = "#0ea5e9");
+    input.addEventListener("focus", () => input.style.borderColor = "#C4623A");
     input.addEventListener("blur", () => input.style.borderColor = "#e2e8f0");
     input.addEventListener("change", (e) => {
-        setStartDate(e.target.value);
-        render();
-        showToast("Dates updated ✓");
+      setStartDate(e.target.value);
+      render();
+      showToast("Dates updated ✓");
     });
   }
 
   function renderBudgetTracker() {
     let card = document.getElementById("budgetCard");
     const sidebar = document.querySelector(".sidebar");
-    
+
     if (!card) {
       card = document.createElement("div");
       card.id = "budgetCard";
       card.style.cssText = `background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 12px; padding: 16px; margin-bottom: 16px; color: #166534;`;
-      
+
       const hotelCard = document.getElementById("hotelCard");
       if (hotelCard) sidebar.insertBefore(card, hotelCard.nextSibling);
       else sidebar.appendChild(card);
@@ -188,9 +188,9 @@ document.addEventListener("DOMContentLoaded", function() {
     const days = getDays();
     let totalSpent = 0;
     days.forEach(day => {
-        day.activities.forEach(act => {
-            if (act.cost) totalSpent += parseFloat(act.cost);
-        });
+      day.activities.forEach(act => {
+        if (act.cost) totalSpent += parseFloat(act.cost);
+      });
     });
 
     const budget = getBudget();
@@ -212,14 +212,62 @@ document.addEventListener("DOMContentLoaded", function() {
     `;
 
     document.getElementById("editBudgetBtn").addEventListener("click", () => {
-        const newBudget = prompt("Enter your total trip budget ($):", budget);
-        if (newBudget !== null) {
-            const cleanBudget = parseFloat(newBudget.replace(/[^0-9.]/g, "")) || 0;
-            setBudget(cleanBudget);
-            renderBudgetTracker();
-        }
+      const newBudget = prompt("Enter your total trip budget ($):", budget);
+      if (newBudget !== null) {
+        const cleanBudget = parseFloat(newBudget.replace(/[^0-9.]/g, "")) || 0;
+        setBudget(cleanBudget);
+        renderBudgetTracker();
+      }
     });
   }
+
+  // ─────────────────────────────────────────
+  // HOTEL CARD — fixed to read from "myTrip"
+  // ─────────────────────────────────────────
+
+  function renderHotelCard() {
+    const trip = JSON.parse(localStorage.getItem("myTrip")) || [];
+    const hotel = trip.find(s => s.name.startsWith("🏨"));
+
+    let card = document.getElementById("hotelCard");
+    const sidebar = document.querySelector(".sidebar");
+
+    if (!card) {
+      card = document.createElement("div");
+      card.id = "hotelCard";
+      card.style.cssText = `background: var(--terracotta, #C4623A); border-radius: 12px; padding: 16px 18px; margin-bottom: 16px; color: white;`;
+      const datePicker = document.getElementById("datePickerContainer");
+      if (datePicker) sidebar.insertBefore(card, datePicker.nextSibling);
+      else sidebar.insertBefore(card, sidebar.firstChild);
+    }
+
+    if (!hotel) {
+      card.innerHTML = `
+        <div style="font-size:0.75rem;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;opacity:0.8;margin-bottom:6px;">🏨 Your Hotel</div>
+        <div style="font-size:0.85rem;opacity:0.8;">No hotel saved yet.</div>
+        <a href="destination.html" style="display:inline-block;margin-top:10px;padding:5px 12px;background:rgba(255,255,255,0.2);border-radius:20px;font-size:0.75rem;color:white;text-decoration:none;font-weight:600;">+ Find Hotel</a>
+      `;
+      return;
+    }
+
+    const cleanName = hotel.name.replace("🏨 ", "");
+    card.innerHTML = `
+      <div style="font-size:0.75rem;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;opacity:0.8;margin-bottom:8px;">🏨 Your Hotel</div>
+      <div style="font-size:1rem;font-weight:700;margin-bottom:4px;">${cleanName}</div>
+      <div style="font-size:0.82rem;opacity:0.85;">${hotel.price}</div>
+      <button onclick="clearHotel()" style="margin-top:12px;padding:4px 10px;background:rgba(255,255,255,0.2);border:1px solid rgba(255,255,255,0.3);border-radius:20px;font-size:0.72rem;color:white;cursor:pointer;font-family:inherit;">✕ Remove</button>
+    `;
+  }
+
+  window.clearHotel = function() {
+    showConfirm("Remove this saved hotel?", () => {
+      const trip = JSON.parse(localStorage.getItem("myTrip")) || [];
+      const filtered = trip.filter(s => !s.name.startsWith("🏨"));
+      localStorage.setItem("myTrip", JSON.stringify(filtered));
+      renderHotelCard();
+      showToast("Hotel removed", "warning");
+    });
+  };
 
   // ─────────────────────────────────────────
   // RENDER ITINERARY
@@ -236,11 +284,11 @@ document.addEventListener("DOMContentLoaded", function() {
     setupChecklist();
 
     if (days.length === 0) {
-      container.innerHTML = `<div class="empty-state" style="padding:40px; text-align:center;"><div style="font-size:3rem; margin-bottom:10px; opacity:0.3;">🗓️</div><p>No days yet.</p><button id="startEmptyBtn" style="margin-top:10px; padding:8px 16px; background:#0ea5e9; color:white; border:none; border-radius:6px; cursor:pointer; font-weight:600;">+ Add Day 1</button></div>`;
+      container.innerHTML = `<div class="empty-state" style="padding:40px; text-align:center;"><div style="font-size:3rem; margin-bottom:10px; opacity:0.3;">🗓️</div><p>No days yet.</p><button id="startEmptyBtn" style="margin-top:10px; padding:8px 16px; background:#C4623A; color:white; border:none; border-radius:6px; cursor:pointer; font-weight:600;">+ Add Day 1</button></div>`;
       document.getElementById("startEmptyBtn").addEventListener("click", () => {
-          days.push({ label: "Day 1", activities: [] });
-          saveDays(days);
-          render();
+        days.push({ label: "Day 1", activities: [] });
+        saveDays(days);
+        render();
       });
       return;
     }
@@ -253,8 +301,8 @@ document.addEventListener("DOMContentLoaded", function() {
       header.className = "day-header";
       header.innerHTML = `
         <div style="display:flex; flex-direction:column;">
-            <h3 style="margin-bottom:2px; font-size:1.1rem;">${day.label}</h3>
-            ${day.subLabel ? `<span style="font-size:0.75rem; color:#94a3b8; font-weight:600; text-transform:uppercase; letter-spacing:0.05em;">${day.subLabel}</span>` : ""}
+          <h3 style="margin-bottom:2px; font-size:1.1rem;">${day.label}</h3>
+          ${day.subLabel ? `<span style="font-size:0.75rem; color:#94a3b8; font-weight:600; text-transform:uppercase; letter-spacing:0.05em;">${day.subLabel}</span>` : ""}
         </div>
         <button class="delete-day-btn" title="Remove this day" data-day="${dayIndex}" style="font-size:0.8rem;">✕ Remove</button>
       `;
@@ -270,17 +318,17 @@ document.addEventListener("DOMContentLoaded", function() {
         day.activities.forEach((act, actIndex) => {
           const row = document.createElement("div");
           row.className = "activity-item";
-          const isSaved = act.time === "Saved"; 
+          const isSaved = act.time === "Saved";
           const mapUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(act.text)}`;
 
           row.innerHTML = `
             <span class="time ${isSaved ? "saved-tag" : ""}">${act.time}</span>
             <div style="display:flex; flex-direction:column; justify-content:center; margin-left:10px;">
-                <span class="activity-text">${act.text}</span>
-                ${act.cost ? `<span style="font-size:0.75rem; color:#15803d; font-weight:600;">$${act.cost}</span>` : ""}
+              <span class="activity-text">${act.text}</span>
+              ${act.cost ? `<span style="font-size:0.75rem; color:#15803d; font-weight:600;">$${act.cost}</span>` : ""}
             </div>
-            <a href="${mapUrl}" target="_blank" title="Get Directions" style="margin-left:auto; margin-right:12px; text-decoration:none; color:#3b82f6; font-size:0.85rem; font-weight:600; display:flex; align-items:center; gap:4px; border:1px solid #e2e8f0; padding:4px 8px; border-radius:20px; background:white;">
-               🚗 Navigate ↗
+            <a href="${mapUrl}" target="_blank" title="Get Directions" style="margin-left:auto; margin-right:12px; text-decoration:none; color:#C4623A; font-size:0.85rem; font-weight:600; display:flex; align-items:center; gap:4px; border:1px solid #EDE3CC; padding:4px 8px; border-radius:20px; background:white;">
+              🚗 Navigate ↗
             </a>
             <button class="delete-btn" data-day="${dayIndex}" data-act="${actIndex}" title="Remove">✕</button>
           `;
@@ -310,11 +358,11 @@ document.addEventListener("DOMContentLoaded", function() {
       btn.addEventListener("click", () => {
         const dayLabel = getDays()[btn.dataset.day].label;
         showConfirm(`Remove ${dayLabel} and its activities?`, () => {
-            const days = getDays();
-            days.splice(Number(btn.dataset.day), 1);
-            saveDays(days);
-            render();
-            showToast("Day removed", "warning");
+          const days = getDays();
+          days.splice(Number(btn.dataset.day), 1);
+          saveDays(days);
+          render();
+          showToast("Day removed", "warning");
         });
       });
     });
@@ -336,27 +384,27 @@ document.addEventListener("DOMContentLoaded", function() {
 
   function openModal(dayIndex) {
     _activeDayIndex = dayIndex;
-    
+
     document.getElementById("activityTime").value = "";
     document.getElementById("activityName").value = "";
-    
+
     let costGroup = document.getElementById("costInputGroup");
     if (!costGroup) {
-        costGroup = document.createElement("div");
-        costGroup.id = "costInputGroup";
-        costGroup.style.marginBottom = "15px";
-        costGroup.innerHTML = `
-            <label style="display:block; font-size:0.75rem; font-weight:700; text-transform:uppercase; color:#94a3b8; margin-bottom:6px;">Cost ($)</label>
-            <input type="number" id="activityCost" placeholder="0" style="width: 100%; padding: 10px; border: 1px solid #e2e8f0; border-radius: 8px; font-family: inherit; font-size: 0.95rem; color: #334155; outline: none;">
-        `;
-        const activityInput = document.getElementById("activityName");
-        activityInput.parentNode.insertBefore(costGroup, activityInput.nextSibling);
+      costGroup = document.createElement("div");
+      costGroup.id = "costInputGroup";
+      costGroup.style.marginBottom = "15px";
+      costGroup.innerHTML = `
+        <label style="display:block; font-size:0.75rem; font-weight:700; text-transform:uppercase; color:#94a3b8; margin-bottom:6px;">Cost ($)</label>
+        <input type="number" id="activityCost" placeholder="0" style="width: 100%; padding: 10px; border: 1px solid #e2e8f0; border-radius: 8px; font-family: inherit; font-size: 0.95rem; color: #334155; outline: none;">
+      `;
+      const activityInput = document.getElementById("activityName");
+      activityInput.parentNode.insertBefore(costGroup, activityInput.nextSibling);
     }
     document.getElementById("activityCost").value = "";
 
     renderDaySelect(dayIndex);
     renderSavedSuggestions(document.getElementById("activityName"));
-    
+
     document.getElementById("activityModal").classList.add("open");
     document.getElementById("activityTime").focus();
   }
@@ -364,7 +412,7 @@ document.addEventListener("DOMContentLoaded", function() {
   function renderDaySelect(selectedIndex) {
     const timeInput = document.getElementById("activityTime");
     let container = document.getElementById("daySelectContainer");
-    
+
     if (!container) {
       container = document.createElement("div");
       container.id = "daySelectContainer";
@@ -377,7 +425,7 @@ document.addEventListener("DOMContentLoaded", function() {
       select.style.cssText = "width: 100%; padding: 10px; border: 1px solid #e2e8f0; border-radius: 8px; font-family: inherit; background: white; font-size: 0.95rem; color: #334155; outline: none;";
       container.appendChild(label);
       container.appendChild(select);
-      
+
       const prev = timeInput.previousElementSibling;
       if (prev && prev.tagName === "LABEL") timeInput.parentNode.insertBefore(container, prev);
       else timeInput.parentNode.insertBefore(container, timeInput);
@@ -389,7 +437,7 @@ document.addEventListener("DOMContentLoaded", function() {
     days.forEach((day, index) => {
       const option = document.createElement("option");
       option.value = index;
-      let text = day.label; 
+      let text = day.label;
       if (day.subLabel) text += ` (${day.subLabel})`;
       option.textContent = text;
       select.appendChild(option);
@@ -405,7 +453,7 @@ document.addEventListener("DOMContentLoaded", function() {
       container = document.createElement("div");
       container.id = containerId;
       container.style.cssText = "display:flex; flex-wrap:wrap; gap:8px; margin-top:10px;";
-      
+
       const costGroup = document.getElementById("costInputGroup");
       if (costGroup) costGroup.parentNode.insertBefore(container, costGroup.nextSibling);
       else inputElement.parentNode.insertBefore(container, inputElement.nextSibling);
@@ -423,45 +471,39 @@ document.addEventListener("DOMContentLoaded", function() {
       if (spot.name.includes("🏨")) return;
 
       const chip = document.createElement("div");
-      chip.style.cssText = `display:inline-flex; align-items:center; background:#f0f9ff; border:1px solid #bae6fd; border-radius:16px; padding:5px 12px; font-size:0.85rem; color:#0284c7; cursor:pointer; transition:all 0.2s;`;
-      chip.onmouseover = () => chip.style.background = "#e0f2fe";
-      chip.onmouseout  = () => chip.style.background = "#f0f9ff";
+      chip.style.cssText = `display:inline-flex; align-items:center; background:#FFF5F0; border:1px solid #EDE3CC; border-radius:16px; padding:5px 12px; font-size:0.85rem; color:#C4623A; cursor:pointer; transition:all 0.2s;`;
+      chip.onmouseover = () => chip.style.background = "#FDEEE8";
+      chip.onmouseout  = () => chip.style.background = "#FFF5F0";
 
       const text = document.createElement("span");
       text.textContent = spot.name;
-      
-      // ⬇️ UPDATED: Remove from saved list when clicked to fill
-      text.onclick = () => { 
-          // 1. Fill inputs
-          inputElement.value = spot.name; 
-          
-          if (spot.price) {
-              const nums = spot.price.toString().replace(/[^0-9.]/g, "");
-              const costInput = document.getElementById("activityCost");
-              if (costInput && nums) costInput.value = nums;
-          }
-          
-          // 2. Remove from saved list immediately
-          saved.splice(index, 1);
-          localStorage.setItem("myTrip", JSON.stringify(saved));
-          
-          // 3. Re-render to show it's gone from the queue
-          renderSavedSuggestions(inputElement);
-          
-          inputElement.focus(); 
+
+      text.onclick = () => {
+        inputElement.value = spot.name;
+
+        if (spot.price) {
+          const nums = spot.price.toString().replace(/[^0-9.]/g, "");
+          const costInput = document.getElementById("activityCost");
+          if (costInput && nums) costInput.value = nums;
+        }
+
+        saved.splice(index, 1);
+        localStorage.setItem("myTrip", JSON.stringify(saved));
+        renderSavedSuggestions(inputElement);
+        inputElement.focus();
       };
 
       const delBtn = document.createElement("span");
       delBtn.innerHTML = "×";
       delBtn.title = "Remove";
-      delBtn.style.cssText = "margin-left:8px; font-weight:bold; color:#7dd3fc; border-left:1px solid #bae6fd; padding-left:8px; font-size:1.1rem; line-height:1;";
-      
+      delBtn.style.cssText = "margin-left:8px; font-weight:bold; color:#D4924A; border-left:1px solid #EDE3CC; padding-left:8px; font-size:1.1rem; line-height:1;";
+
       delBtn.onclick = (e) => {
         e.stopPropagation();
         showConfirm(`Remove "${spot.name}" from your saved list?`, () => {
-            saved.splice(index, 1);
-            localStorage.setItem("myTrip", JSON.stringify(saved));
-            renderSavedSuggestions(inputElement);
+          saved.splice(index, 1);
+          localStorage.setItem("myTrip", JSON.stringify(saved));
+          renderSavedSuggestions(inputElement);
         });
       };
 
@@ -477,15 +519,15 @@ document.addEventListener("DOMContentLoaded", function() {
   }
 
   const modalCancel = document.getElementById("modalCancel");
-  if(modalCancel) modalCancel.addEventListener("click", closeModal);
+  if (modalCancel) modalCancel.addEventListener("click", closeModal);
   document.getElementById("activityModal").addEventListener("click", (e) => { if (e.target === e.currentTarget) closeModal(); });
 
   const modalConfirm = document.getElementById("modalConfirm");
-  if(modalConfirm) modalConfirm.addEventListener("click", () => {
+  if (modalConfirm) modalConfirm.addEventListener("click", () => {
     const time = document.getElementById("activityTime").value.trim();
     const text = document.getElementById("activityName").value.trim();
     const cost = document.getElementById("activityCost").value.trim();
-    
+
     const select = document.getElementById("activityDaySelect");
     const targetDayIndex = select ? Number(select.value) : _activeDayIndex;
 
@@ -493,11 +535,11 @@ document.addEventListener("DOMContentLoaded", function() {
 
     const days = getDays();
     if (days[targetDayIndex]) {
-        days[targetDayIndex].activities.push({ time, text, cost: cost || 0 });
-        saveDays(days);
-        closeModal();
-        render();
-        showToast(`Activity added ✓`);
+      days[targetDayIndex].activities.push({ time, text, cost: cost || 0 });
+      saveDays(days);
+      closeModal();
+      render();
+      showToast(`Activity added ✓`);
     }
   });
 
@@ -514,43 +556,12 @@ document.addEventListener("DOMContentLoaded", function() {
   });
 
   document.getElementById("clearAllBtn").addEventListener("click", () => {
-    showConfirm("Clear all days and activities? This cannot be undone.", () => {
-        localStorage.setItem("tripDays", "[]"); 
-        localStorage.removeItem("tripStartDate");
-        localStorage.removeItem("tripBudget");
-        document.getElementById("tripStartInput").value = "";
-        render();
-        showToast("All cleared", "warning");
+    showConfirm("Clear everything? This will reset all trip data.", () => {
+      localStorage.clear();
+      render();
+      showToast("All data cleared", "warning");
     });
   });
-
-  function renderHotelCard() {
-    const hotel = JSON.parse(localStorage.getItem("savedHotel"));
-    let card = document.getElementById("hotelCard");
-    const sidebar = document.querySelector(".sidebar");
-    
-    if (!card) {
-      card = document.createElement("div");
-      card.id = "hotelCard";
-      card.style.cssText = `background: linear-gradient(135deg, #0369a1 0%, #0ea5e9 100%); border-radius: 12px; padding: 16px 18px; margin-bottom: 16px; color: white; box-shadow: 0 4px 12px rgba(3,105,161,0.15);`;
-      const datePicker = document.getElementById("datePickerContainer");
-      if (datePicker) sidebar.insertBefore(card, datePicker.nextSibling);
-      else sidebar.insertBefore(card, sidebar.firstChild);
-    }
-    if (!hotel) {
-      card.innerHTML = `<div style="font-size:0.75rem;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;opacity:0.8;margin-bottom:6px;">🏨 Your Hotel</div><div style="font-size:0.85rem;opacity:0.8;">No hotel saved yet.</div><a href="destination.html" style="display:inline-block;margin-top:10px;padding:5px 12px;background:rgba(255,255,255,0.2);border-radius:20px;font-size:0.75rem;color:white;text-decoration:none;font-weight:600;">+ Find Hotel</a>`;
-      return;
-    }
-    card.innerHTML = `<div style="font-size:0.75rem;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;opacity:0.8;margin-bottom:8px;">🏨 Your Hotel</div><div style="font-size:1rem;font-weight:700;margin-bottom:4px;">${hotel.name}</div><div style="font-size:0.82rem;opacity:0.85;">${hotel.price}</div><button onclick="clearHotel()" style="margin-top:12px;padding:4px 10px;background:rgba(255,255,255,0.2);border:1px solid rgba(255,255,255,0.3);border-radius:20px;font-size:0.72rem;color:white;cursor:pointer;font-family:inherit;">✕ Remove</button>`;
-  }
-
-  window.clearHotel = function() {
-    showConfirm("Remove this saved hotel?", () => {
-        localStorage.removeItem("savedHotel");
-        renderHotelCard();
-        showToast("Hotel removed", "warning");
-    });
-  };
 
   function setupChecklist() {
     document.querySelectorAll('.sidebar input[type="checkbox"]').forEach((box, i) => {
@@ -561,91 +572,161 @@ document.addEventListener("DOMContentLoaded", function() {
   }
 
   // ─────────────────────────────────────────
-  // MAP LOGIC (FORCE VISIBLE - REMOVE TOGGLE BUTTON)
+  // MAP
   // ─────────────────────────────────────────
 
   const toggleBtn = document.getElementById("mapToggleBtn");
-  if (toggleBtn) toggleBtn.remove(); // DELETE ELEMENT
+  if (toggleBtn) toggleBtn.remove();
 
   const mapBody = document.getElementById("mapBody");
   if (mapBody) {
-      mapBody.style.display = "block"; // FORCE SHOW
-      const mapDiv = document.getElementById("tripMap");
-      if (mapDiv) mapDiv.style.height = "420px";
+    mapBody.style.display = "block";
+    const mapDiv = document.getElementById("tripMap");
+    if (mapDiv) mapDiv.style.height = "420px";
   }
 
   let mapInstance = null;
   setTimeout(autoInitMap, 500);
 
   function autoInitMap() {
-    const cached = localStorage.getItem("lastSearchedCity") || "";
-    const days = getDays();
-    let hasActs = false;
-    days.forEach(d => { if(d.activities.length > 0) hasActs = true; });
-
-    let city = cached;
-    if (hasActs && !city) {
-         city = prompt("Which city is this trip for? (for map)", "") || "";
-         if (city) localStorage.setItem("lastSearchedCity", city);
-    }
-    
+    const city = localStorage.getItem("lastSearchedCity") || "";
+    console.log("lastSearchedCity:", city);
     geocodeAndRender(city);
   }
 
   async function geocodeAndRender(city) {
+    console.log("Geocoding with city:", city);
+
     const days = getDays();
     const allActs = [];
-    days.forEach(day => day.activities.forEach(act => allActs.push({ text: act.text, time: act.time })));
-    
-    const mapDiv = document.getElementById("tripMap");
-    if (allActs.length === 0) { 
-        mapDiv.innerHTML = `<div style="padding:40px;text-align:center;color:#94a3b8;background:#f8fafc;height:100%;display:flex;align-items:center;justify-content:center;">Add activities to see them on the map.</div>`; 
-        return; 
+
+    // Add activities
+    days.forEach(day => day.activities.forEach(act => {
+      allActs.push({ text: act.text, time: act.time, isHotel: false });
+    }));
+
+    // Add hotel from myTrip
+    const trip = JSON.parse(localStorage.getItem("myTrip")) || [];
+    const hotel = trip.find(s => s.name.startsWith("🏨"));
+    if (hotel) {
+      allActs.push({
+        text: hotel.name.replace("🏨 ", "").trim(),
+        time: "Hotel",
+        isHotel: true
+      });
     }
-    
-    mapDiv.innerHTML = `<div style="padding:40px;text-align:center;color:#94a3b8;background:#f8fafc;height:100%;display:flex;align-items:center;justify-content:center;">Locating spots...</div>`;
-    
+
+    const mapDiv = document.getElementById("tripMap");
+    if (allActs.length === 0) {
+      mapDiv.innerHTML = `<div style="padding:40px;text-align:center;color:#94a3b8;">Add activities to see them on the map.</div>`;
+      return;
+    }
+
+    mapDiv.innerHTML = `<div style="padding:40px;text-align:center;color:#94a3b8;">Locating spots...</div>`;
+
     const geocoded = [];
     for (const act of allActs) {
       const cleanName = act.text.replace(/🏨\s?/, "").split(" (")[0].trim();
       try {
-        const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(cleanName + (city ? " " + city : ""))}&format=json&limit=1`;
+        const query = city ? `${cleanName}, ${city}` : cleanName;
+        const url = `https://photon.komoot.io/api/?q=${encodeURIComponent(query)}&limit=1`;
         const res = await fetch(url);
         const data = await res.json();
-        if (data && data[0]) geocoded.push({ name: cleanName, lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon), isHotel: act.text.startsWith("🏨"), time: act.time });
-      } catch (_) {}
-      await new Promise(r => setTimeout(r, 1100));
+        console.log("Geocode result for:", cleanName, data);
+        if (data.features && data.features[0]) {
+          const [lng, lat] = data.features[0].geometry.coordinates;
+          geocoded.push({
+            name: cleanName,
+            lat,
+            lng,
+            isHotel: act.isHotel,
+            time: act.time
+          });
+        }
+      } catch (err) {
+        console.error("Geocode failed for:", cleanName, err);
+      }
+      await new Promise(r => setTimeout(r, 200));
     }
+
+    console.log("All acts being geocoded:", allActs);
+    console.log("Final geocoded points:", geocoded);
     renderMap(geocoded);
   }
 
   function renderMap(points) {
     if (mapInstance) { mapInstance.remove(); mapInstance = null; }
-    
+  
     const mapDiv = document.getElementById("tripMap");
     mapDiv.innerHTML = "";
-    
-    mapInstance = L.map("tripMap");
-    L.tileLayer("https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png", { attribution: "© OpenStreetMap", maxZoom: 19 }).addTo(mapInstance);
+  
+    mapInstance = L.map("tripMap", { zoomControl: false });
+  
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      attribution: "© OpenStreetMap",
+      maxZoom: 19
+    }).addTo(mapInstance);
+  
     L.control.zoom({ position: "topright" }).addTo(mapInstance);
-    
+  
     const bounds = [];
-    points.forEach(p => { 
-        L.marker([p.lat, p.lng]).addTo(mapInstance).bindPopup(`<b>${p.name}</b><br>${p.time}`); 
-        bounds.push([p.lat, p.lng]); 
-    });
+  
+    // Draw distance lines between consecutive points
+    if (points.length > 1) {
+      for (let i = 0; i < points.length - 1; i++) {
+        L.polyline(
+          [[points[i].lat, points[i].lng], [points[i+1].lat, points[i+1].lng]],
+          { color: "#EDE3CC", weight: 2, dashArray: "6, 6", opacity: 0.8 }
+        ).addTo(mapInstance);
+      }
+    }
+  
+    points.forEach(p => {
+      const color = p.isHotel ? "#C4623A" : "#D4924A";
+      const icon = L.divIcon({
+        className: "",
+        html: `<div style="width:14px;height:14px;border-radius:50%;background:${color};border:2px solid white;box-shadow:0 2px 6px rgba(0,0,0,0.3);"></div>`,
+        iconSize: [14, 14],
+        iconAnchor: [7, 7]
+      });
     
-    if (bounds.length > 0) mapInstance.fitBounds(bounds, { padding: [50, 50] });
-    else if (points.length === 0) mapInstance.setView([0, 0], 2); 
+      const marker = L.marker([p.lat, p.lng], { icon })
+        .bindPopup(`<b>${p.name}</b><br><span style="color:#888;font-size:0.8rem;">${p.time}</span>`, { 
+          closeButton: false, 
+          offset: [0, -8] 
+        })
+        .addTo(mapInstance);
+    
+      // Hover to open, mouseout to close
+      marker.on("mouseover", function() { this.openPopup(); });
+      marker.on("mouseout", function() { this.closePopup(); });
+    
+      bounds.push([p.lat, p.lng]);
+    });
+  
+    if (bounds.length > 0) {
+      mapInstance.fitBounds(bounds, { padding: [50, 50] });
+    } else {
+      mapInstance.setView([20, 0], 2);
+    }
+  
+    setTimeout(() => mapInstance.invalidateSize(), 300);
   }
+
+  // ─────────────────────────────────────────
+  // BOOT
+  // ─────────────────────────────────────────
 
   const savedDays = JSON.parse(localStorage.getItem("tripDays"));
   if (savedDays === null) {
-     const savedSpots = JSON.parse(localStorage.getItem("myTrip")) || [];
-     if (savedSpots.length > 0) {
-         const days = getDays(); 
-         if (days.length === 0) { days.push({ label: "Day 1", activities: [] }); localStorage.setItem("tripDays", JSON.stringify(days)); }
-     }
+    const savedSpots = JSON.parse(localStorage.getItem("myTrip")) || [];
+    if (savedSpots.length > 0) {
+      const days = getDays();
+      if (days.length === 0) {
+        days.push({ label: "Day 1", activities: [] });
+        localStorage.setItem("tripDays", JSON.stringify(days));
+      }
+    }
   }
   render();
 });
