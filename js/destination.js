@@ -36,6 +36,7 @@ currencySelect.innerHTML = Object.keys(currencySymbols)
 let exchangeRates = {};
 let lastSpots     = [];
 let lastHotels    = [];
+let lastRestaurants = [];
 let localCurrency = null;
 let localCityName = "";
 let showOverBudget = false;
@@ -252,18 +253,24 @@ function renderTabs() {
   }
 
   tabBar.innerHTML = `
-    <button id="tabAttractions" onclick="switchTab('attractions')" style="
+    <button onclick="switchTab('attractions')" style="
       padding:10px 24px; border:none; cursor:pointer; font-size:0.9rem; font-weight:600;
       background:${activeTab==="attractions" ? "#a8dadc" : "#fff"};
       color:${activeTab==="attractions" ? "#fff" : "#555"};
       font-family:inherit; transition:all 0.2s;
     ">🗺️ Attractions</button>
-    <button id="tabHotels" onclick="switchTab('hotels')" style="
+    <button onclick="switchTab('hotels')" style="
       padding:10px 24px; border:none; cursor:pointer; font-size:0.9rem; font-weight:600;
       background:${activeTab==="hotels" ? "#a8dadc" : "#fff"};
       color:${activeTab==="hotels" ? "#fff" : "#555"};
       font-family:inherit; transition:all 0.2s; border-left:1px solid #a8dadc;
     ">🏨 Hotels</button>
+    <button onclick="switchTab('restaurants')" style="
+      padding:10px 24px; border:none; cursor:pointer; font-size:0.9rem; font-weight:600;
+      background:${activeTab==="restaurants" ? "#a8dadc" : "#fff"};
+      color:${activeTab==="restaurants" ? "#fff" : "#555"};
+      font-family:inherit; transition:all 0.2s; border-left:1px solid #a8dadc;
+    ">🍽️ Restaurants</button>
   `;
 }
 
@@ -274,12 +281,14 @@ function switchTab(tab) {
   if (tab === "attractions") {
     if (lastSpots.length > 0) renderAttractions();
     else fetchAttractions(localCityName);
-  } else {
+  } else if (tab === "hotels") {
     if (lastHotels.length > 0) renderHotels();
     else fetchHotels(localCityName);
+  } else {
+    if (lastRestaurants.length > 0) renderRestaurants();
+    else fetchRestaurants(localCityName);
   }
 }
-
 
 // --- Apply Filter + Sort ---
 function applyFilterSort(spots) {
@@ -693,6 +702,112 @@ Keep each desc under 15 words. Compact format required.
   }
 }
 
+async function fetchRestaurants(city) {
+  spotsGrid.innerHTML = `<div style="grid-column:1/-1;text-align:center;padding:40px;">
+    <div class="spinner"></div><p>Finding restaurants in ${city}…</p></div>`;
+
+  try {
+    const res = await fetch(
+      `https://generativelanguage.googleapis.com/v1/models/gemini-2.5-flash:generateContent?key=${API_KEY}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text:
+            `You are a restaurant search API. List 20 real restaurants in ${city} across budget, mid-range, and fine dining tiers.
+All "price_per_person" values MUST be in USD (average meal cost per person).
+Return ONLY a raw JSON array, no markdown, no backticks, no explanation.
+Keep each desc under 15 words. Compact format required.
+[{"name":"Restaurant Name","cuisine":"Cuisine Type","area":"Neighbourhood","rating":4.5,"reviews":"2k","price_per_person":15,"must_try":"Signature dish name","image":"🍜","desc":"Short description."}]`
+          }] }],
+          generationConfig: { temperature: 0.3, maxOutputTokens: 3000 }
+        })
+      }
+    );
+
+    const data = await res.json();
+    if (data.error) throw new Error(data.error.message);
+
+    let text = data.candidates[0].content.parts[0].text;
+    text = text.replace(/```json/gi, "").replace(/```/g, "").trim();
+
+    lastRestaurants = safeParseArray(text);
+    renderTabs();
+    renderRestaurants();
+
+  } catch (err) {
+    console.error(err);
+    spotsGrid.innerHTML = `<div style="grid-column:1/-1;text-align:center;color:#e74c3c;padding:40px;">
+      <h3>Could not load restaurants</h3><p>${err.message}</p></div>`;
+  }
+}
+
+function renderRestaurants() {
+  spotsGrid.innerHTML = "";
+
+  const uc = currencySelect.value;
+  const lc = localCurrency;
+  const budgetUSD = totalBudgetInUSD();
+  // Use 10% of total budget as a per-meal budget threshold
+  const mealBudgetUSD = budgetUSD * 0.10;
+
+  const affordable = lastRestaurants.filter(r => r.price_per_person <= mealBudgetUSD);
+  const tooExp     = lastRestaurants.filter(r => r.price_per_person > mealBudgetUSD);
+
+  const mealBudgetUser = toUserCurrency(mealBudgetUSD);
+  resultsCount.textContent = `${lastRestaurants.length} restaurants found · ${affordable.length} within ~${sym(uc)}${fmt(mealBudgetUser)}/person meal budget`;
+
+  if (affordable.length === 0 && lastRestaurants.length > 0) {
+    const msg = document.createElement("div");
+    msg.style.cssText = "grid-column:1/-1; text-align:center; padding:30px; color:#666;";
+    msg.innerHTML = `<p>😅 No restaurants fit your current budget. Try increasing it.</p>`;
+    spotsGrid.appendChild(msg);
+  }
+
+  const renderRestaurantCard = (r, dimmed) => {
+    const priceUser  = toUserCurrency(r.price_per_person);
+    const priceLocal = lc && lc !== uc ? toLocalCurrency(r.price_per_person) : null;
+
+    const card = document.createElement("div");
+    card.className = "spot-card";
+    if (dimmed) { card.style.opacity = "0.5"; card.style.filter = "grayscale(30%)"; }
+
+    card.innerHTML = `
+      <div class="card-header"><span class="card-icon">${r.image || "🍽️"}</span></div>
+      <div class="card-body">
+        <h3>${r.name}</h3>
+        <div style="font-size:0.82rem; color:#e67e22; font-weight:600; margin-bottom:4px;">🍴 ${r.cuisine || "Restaurant"}</div>
+        <div style="font-size:0.82rem; color:#888; margin-bottom:6px;">📍 ${r.area || localCityName}</div>
+        <div class="rating">⭐ ${r.rating} <span style="color:#999">(${r.reviews})</span></div>
+        <p>${r.desc}</p>
+        ${r.must_try ? `<div style="font-size:0.82rem; background:#fff8f0; border-left:3px solid #e67e22; padding:5px 8px; margin:8px 0; border-radius:0 6px 6px 0; color:#c0392b;">
+          🌟 Must try: <strong>${r.must_try}</strong>
+        </div>` : ""}
+        <div class="price-box">
+          <span>PER PERSON${dimmed ? ' <span style="font-size:0.7rem;color:#e74c3c;">over meal budget</span>' : ''}</span>
+          <strong style="color:#e67e22">${sym(uc)}${fmt(priceUser)}</strong>
+          ${priceLocal ? `<small style="color:#888;display:block;margin-top:2px;">${sym(lc)}${fmt(priceLocal)} ${lc}/person</small>` : ""}
+        </div>
+        <button class="learn-btn" onclick="addToItinerary(this)"
+          data-name="${r.name}" data-price="${sym(uc)}${fmt(priceUser)}/person"
+          ${dimmed ? 'style="background:#ccc;"' : ""}>
+          + Add to Itinerary
+        </button>
+      </div>`;
+    spotsGrid.appendChild(card);
+  };
+
+  affordable.forEach(r => renderRestaurantCard(r, false));
+
+  if (tooExp.length > 0) {
+    const divider = document.createElement("div");
+    divider.style.cssText = "grid-column:1/-1; text-align:center; color:#aaa; font-size:0.85rem; padding:8px 0; border-top:1px dashed #ddd;";
+    divider.textContent = `⬇️ ${tooExp.length} restaurant${tooExp.length > 1 ? "s" : ""} over your meal budget`;
+    spotsGrid.appendChild(divider);
+    tooExp.forEach(r => renderRestaurantCard(r, true));
+  }
+}
+
 
 // --- Discover button ---
 discoverBtn.addEventListener("click", () => {
@@ -701,7 +816,7 @@ discoverBtn.addEventListener("click", () => {
 
   localStorage.setItem("selectedDays", daysRange.value);
   localStorage.setItem("tripBudget", budgetRange.value);
-  localStorage.setItem("lastSearchedCity", rawCity); // ← just save raw, no correction
+  localStorage.setItem("lastSearchedCity", rawCity); 
 
   saveToHistory(rawCity);
 
@@ -710,6 +825,7 @@ discoverBtn.addEventListener("click", () => {
 
   lastSpots  = [];
   lastHotels = [];
+  lastRestaurants = []; 
   activeTab  = "attractions";
   activeFilter = "All";
   activeSort   = "default";
