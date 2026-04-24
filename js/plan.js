@@ -179,7 +179,6 @@ document.addEventListener("DOMContentLoaded", function() {
       card = document.createElement("div");
       card.id = "budgetCard";
       card.style.cssText = `background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 12px; padding: 16px; margin-bottom: 16px; color: #166534;`;
-
       const hotelCard = document.getElementById("hotelCard");
       if (hotelCard) sidebar.insertBefore(card, hotelCard.nextSibling);
       else sidebar.appendChild(card);
@@ -222,7 +221,7 @@ document.addEventListener("DOMContentLoaded", function() {
   }
 
   // ─────────────────────────────────────────
-  // HOTEL CARD — fixed to read from "myTrip"
+  // HOTEL CARD — reads from "myTrip"
   // ─────────────────────────────────────────
 
   function renderHotelCard() {
@@ -235,7 +234,7 @@ document.addEventListener("DOMContentLoaded", function() {
     if (!card) {
       card = document.createElement("div");
       card.id = "hotelCard";
-      card.style.cssText = `background: var(--terracotta, #C4623A); border-radius: 12px; padding: 16px 18px; margin-bottom: 16px; color: white;`;
+      card.style.cssText = `background: #C4623A; border-radius: 12px; padding: 16px 18px; margin-bottom: 16px; color: white;`;
       const datePicker = document.getElementById("datePickerContainer");
       if (datePicker) sidebar.insertBefore(card, datePicker.nextSibling);
       else sidebar.insertBefore(card, sidebar.firstChild);
@@ -480,13 +479,11 @@ document.addEventListener("DOMContentLoaded", function() {
 
       text.onclick = () => {
         inputElement.value = spot.name;
-
         if (spot.price) {
           const nums = spot.price.toString().replace(/[^0-9.]/g, "");
           const costInput = document.getElementById("activityCost");
           if (costInput && nums) costInput.value = nums;
         }
-
         saved.splice(index, 1);
         localStorage.setItem("myTrip", JSON.stringify(saved));
         renderSavedSuggestions(inputElement);
@@ -560,6 +557,10 @@ document.addEventListener("DOMContentLoaded", function() {
       localStorage.clear();
       render();
       showToast("All data cleared", "warning");
+      // Reset the map
+      if (mapInstance) { mapInstance.remove(); mapInstance = null; }
+      const mapDiv = document.getElementById("tripMap");
+      if (mapDiv) mapDiv.innerHTML = `<div style="padding:40px;text-align:center;color:#94a3b8;">Add activities to see them on the map.</div>`;
     });
   });
 
@@ -626,22 +627,20 @@ document.addEventListener("DOMContentLoaded", function() {
 
     const geocoded = [];
     for (const act of allActs) {
-      const cleanName = act.text.replace(/🏨\s?/, "").split(" (")[0].trim();
+      const fullName = act.text.replace(/🏨\s?/, "").split(" (")[0].trim();
+      const cleanName = act.isHotel
+        ? fullName.split(" ").slice(0, 4).join(" ")
+        : fullName;
       try {
-        const query = city ? `${cleanName}, ${city}` : cleanName;
+        // Query with just "name city" — no bias coords which were causing wrong country matches
+        const query = city ? `${cleanName} ${city}` : cleanName;
         const url = `https://photon.komoot.io/api/?q=${encodeURIComponent(query)}&limit=1`;
         const res = await fetch(url);
         const data = await res.json();
         console.log("Geocode result for:", cleanName, data);
         if (data.features && data.features[0]) {
           const [lng, lat] = data.features[0].geometry.coordinates;
-          geocoded.push({
-            name: cleanName,
-            lat,
-            lng,
-            isHotel: act.isHotel,
-            time: act.time
-          });
+          geocoded.push({ name: cleanName, lat, lng, isHotel: act.isHotel, time: act.time });
         }
       } catch (err) {
         console.error("Geocode failed for:", cleanName, err);
@@ -656,22 +655,20 @@ document.addEventListener("DOMContentLoaded", function() {
 
   function renderMap(points) {
     if (mapInstance) { mapInstance.remove(); mapInstance = null; }
-  
+
     const mapDiv = document.getElementById("tripMap");
     mapDiv.innerHTML = "";
-  
+
     mapInstance = L.map("tripMap", { zoomControl: false });
-  
+
     L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
       attribution: "© OpenStreetMap",
       maxZoom: 19
     }).addTo(mapInstance);
-  
+
     L.control.zoom({ position: "topright" }).addTo(mapInstance);
-  
-    const bounds = [];
-  
-    // Draw distance lines between consecutive points
+
+    // Draw dashed lines between consecutive points
     if (points.length > 1) {
       for (let i = 0; i < points.length - 1; i++) {
         L.polyline(
@@ -680,7 +677,8 @@ document.addEventListener("DOMContentLoaded", function() {
         ).addTo(mapInstance);
       }
     }
-  
+
+    const bounds = [];
     points.forEach(p => {
       const color = p.isHotel ? "#C4623A" : "#D4924A";
       const icon = L.divIcon({
@@ -689,27 +687,26 @@ document.addEventListener("DOMContentLoaded", function() {
         iconSize: [14, 14],
         iconAnchor: [7, 7]
       });
-    
+
       const marker = L.marker([p.lat, p.lng], { icon })
-        .bindPopup(`<b>${p.name}</b><br><span style="color:#888;font-size:0.8rem;">${p.time}</span>`, { 
-          closeButton: false, 
-          offset: [0, -8] 
+        .bindPopup(`<b>${p.name}</b><br><span style="color:#888;font-size:0.8rem;">${p.time}</span>`, {
+          closeButton: false,
+          offset: [0, -8]
         })
         .addTo(mapInstance);
-    
-      // Hover to open, mouseout to close
+
       marker.on("mouseover", function() { this.openPopup(); });
       marker.on("mouseout", function() { this.closePopup(); });
-    
+
       bounds.push([p.lat, p.lng]);
     });
-  
+
     if (bounds.length > 0) {
       mapInstance.fitBounds(bounds, { padding: [50, 50] });
     } else {
       mapInstance.setView([20, 0], 2);
     }
-  
+
     setTimeout(() => mapInstance.invalidateSize(), 300);
   }
 

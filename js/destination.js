@@ -701,7 +701,7 @@ discoverBtn.addEventListener("click", () => {
 
   localStorage.setItem("selectedDays", daysRange.value);
   localStorage.setItem("tripBudget", budgetRange.value);
-  localStorage.setItem("lastSearchedCity", rawCity); // ← THE FIX
+  localStorage.setItem("lastSearchedCity", rawCity); // ← just save raw, no correction
 
   saveToHistory(rawCity);
 
