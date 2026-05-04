@@ -25,37 +25,28 @@
   <section class="page-title">
     <div class="page-eyebrow">Explore the world</div>
     <h2>Destinations</h2>
-    <p class="page-subtitle">Choose your next adventure from our most popular destinations</p>
+    <p class="page-subtitle">Describe your trip in plain English and we'll handle the rest</p>
   </section>
 
   <section class="search-container">
     <div class="search-card">
-      <div class="fields-grid">
-        <div class="field">
-          <label><span class="icon">📍</span> Destination City</label>
-          <input type="text" id="cityInput" placeholder="Where do you want to go?" />
+      <div class="nl-field">
+        <label><span class="icon">✈️</span> Where are you headed?</label>
+        <div class="nl-input-wrap">
+          <textarea id="nlInput" placeholder="e.g. I want to go to Toronto from May 11th to 16th with a $2000 budget" rows="3"></textarea>
+          <div class="nl-parse-state" id="parseState"></div>
         </div>
-        <div class="field">
-          <label><span class="icon">📅</span> Duration (Days)</label>
-          <div class="slider-container">
-            <input type="range" id="daysRange" min="1" max="30" value="3" class="slider" />
-            <span class="slider-value" id="daysValue">3</span>
-          </div>
-          <small class="helper-text" id="daysText">3 days</small>
-        </div>
-        <div class="field">
-          <label><span class="icon">💲</span> Budget Limit</label>
-          <div class="slider-container">
-            <input type="range" id="budgetRange" min="100" max="10000" value="5000" step="100" class="slider" />
-            <span class="slider-value" id="budgetValue">$5,000</span>
-          </div>
-          <small class="helper-text" id="budgetText">Total budget: $5,000</small>
-        </div>
-        <div class="field">
-          <label><span class="icon">🌐</span> Currency</label>
-          <select id="currencySelect"></select>
-        </div>
+        <div id="searchHistory"></div>
       </div>
+
+      <!-- Parsed summary chips — hidden until parsed -->
+      <div class="parsed-summary" id="parsedSummary" style="display:none;">
+        <div class="parsed-chip" id="chipCity"></div>
+        <div class="parsed-chip" id="chipDates"></div>
+        <div class="parsed-chip" id="chipBudget"></div>
+        <div class="parsed-chip" id="chipCurrency"></div>
+      </div>
+
       <button class="discover-btn" id="discoverBtn">Discover Best Spots</button>
     </div>
   </section>

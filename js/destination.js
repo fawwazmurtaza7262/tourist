@@ -3,14 +3,13 @@ console.log("Destination JS loaded");
 const API_KEY = CONFIG.API_KEY;
 
 // --- Element Selection ---
-const cityInput      = document.getElementById("cityInput");
-const daysRange      = document.getElementById("daysRange");
-const daysValue      = document.getElementById("daysValue");
-const daysText       = document.getElementById("daysText");
-const budgetRange    = document.getElementById("budgetRange");
-const budgetValue    = document.getElementById("budgetValue");
-const budgetText     = document.getElementById("budgetText");
-const currencySelect = document.getElementById("currencySelect");
+const nlInput        = document.getElementById("nlInput");
+const parseState     = document.getElementById("parseState");
+const parsedSummary  = document.getElementById("parsedSummary");
+const chipCity       = document.getElementById("chipCity");
+const chipDates      = document.getElementById("chipDates");
+const chipBudget     = document.getElementById("chipBudget");
+const chipCurrency   = document.getElementById("chipCurrency");
 const discoverBtn    = document.getElementById("discoverBtn");
 const resultsSection = document.getElementById("resultsSection");
 const resultsTitle   = document.getElementById("resultsTitle");
@@ -28,23 +27,24 @@ const currencySymbols = {
   THB:"฿", TRY:"₺", ZAR:"R", SEK:"kr", NOK:"kr"
 };
 
-currencySelect.innerHTML = Object.keys(currencySymbols)
-  .map(c => `<option value="${c}">${c} — ${currencySymbols[c].trim()}</option>`)
-  .join("");
-
 // --- State ---
-let exchangeRates = {};
-let lastSpots     = [];
-let lastHotels    = [];
+let exchangeRates   = {};
+let lastSpots       = [];
+let lastHotels      = [];
 let lastRestaurants = [];
-let localCurrency = null;
-let localCityName = "";
-let showOverBudget = false;
-let activeTab     = "attractions";
+let localCurrency   = null;
+let localCityName   = "";
+let showOverBudget  = false;
+let activeTab       = "attractions";
+let activeFilter    = "All";
+let activeSort      = "default";
 
-// --- Filter + Sort State ---
-let activeFilter = "All";
-let activeSort   = "default";
+// Parsed trip params (replaces sliders/dropdowns)
+let parsedCity     = "";
+let parsedDays     = 3;
+let parsedBudget   = 5000;   // in user currency
+let parsedCurrency = "USD";
+let parsedDatesLabel = "";
 
 // --- City → currency map ---
 const cityToCurrency = {
@@ -71,6 +71,91 @@ const cityToCurrency = {
 function getCityKey(raw) { return raw.toLowerCase().replace(/[\s\-'\.]/g, ""); }
 function detectLocalCurrency(raw) { return cityToCurrency[getCityKey(raw)] || null; }
 
+// ─────────────────────────────────────────
+// NL PARSING via Gemini
+// ─────────────────────────────────────────
+
+let parseDebounce = null;
+
+nlInput.addEventListener("input", () => {
+  const val = nlInput.value.trim();
+  discoverBtn.classList.toggle("active", val.length > 5);
+  parsedSummary.style.display = "none";
+  parseState.textContent = "";
+
+  clearTimeout(parseDebounce);
+  if (val.length < 8) return;
+
+  parseDebounce = setTimeout(() => parseInput(val), 700);
+});
+
+async function parseInput(text) {
+  parseState.innerHTML = `<span class="parsing-dot"></span> Parsing…`;
+
+  try {
+    const res = await fetch(
+      `https://generativelanguage.googleapis.com/v1/models/gemini-2.5-flash:generateContent?key=${API_KEY}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text:
+            `Extract trip details from this user input: "${text}"
+
+Return ONLY a raw JSON object, no markdown, no backticks:
+{
+  "city": "City name or empty string",
+  "days": number of days as integer (calculate from dates if given, default 3),
+  "budget": budget amount as number (default 5000 if not mentioned),
+  "currency": "3-letter currency code, infer from city if not stated (e.g. Toronto → CAD, London → GBP, default USD)",
+  "datesLabel": "human-readable date range like 'May 11–16' or empty string"
+}` }] }],
+          generationConfig: { temperature: 0.1, maxOutputTokens: 200 }
+        })
+      }
+    );
+
+    const data = await res.json();
+    if (data.error) throw new Error(data.error.message);
+
+    let raw = data.candidates[0].content.parts[0].text;
+    raw = raw.replace(/```json/gi, "").replace(/```/g, "").trim();
+    const parsed = JSON.parse(raw);
+
+    parsedCity     = parsed.city     || "";
+    parsedDays     = Math.max(1, parseInt(parsed.days) || 3);
+    parsedBudget   = parseFloat(parsed.budget) || 5000;
+    parsedCurrency = (parsed.currency || "USD").toUpperCase();
+    parsedDatesLabel = parsed.datesLabel || "";
+
+    if (!currencySymbols[parsedCurrency]) parsedCurrency = "USD";
+
+    showParsedSummary();
+    parseState.textContent = "";
+
+  } catch (err) {
+    console.warn("Parse error:", err);
+    parseState.textContent = "";
+  }
+}
+
+function showParsedSummary() {
+  if (!parsedCity && !parsedDays) return;
+
+  const sym = currencySymbols[parsedCurrency] || parsedCurrency + " ";
+
+  chipCity.innerHTML     = parsedCity     ? `📍 <strong>${parsedCity}</strong>` : "";
+  chipDates.innerHTML    = parsedDatesLabel ? `📅 <strong>${parsedDatesLabel}</strong> · ${parsedDays} day${parsedDays>1?"s":""}` : `📅 <strong>${parsedDays} day${parsedDays>1?"s":""}</strong>`;
+  chipBudget.innerHTML   = `💰 <strong>${sym}${parsedBudget.toLocaleString()}</strong>`;
+  chipCurrency.innerHTML = `🌐 <strong>${parsedCurrency}</strong>`;
+
+  chipCity.style.display     = parsedCity ? "" : "none";
+  chipDates.style.display    = parsedDays ? "" : "none";
+  chipBudget.style.display   = "";
+  chipCurrency.style.display = "";
+
+  parsedSummary.style.display = "flex";
+}
 
 // ─────────────────────────────────────────
 // SEARCH HISTORY
@@ -90,38 +175,27 @@ function saveToHistory(city) {
 
 function renderHistory() {
   let container = document.getElementById("searchHistory");
-  if (!container) {
-    container = document.createElement("div");
-    container.id = "searchHistory";
-    container.style.cssText = "margin-top:10px; display:flex; flex-wrap:wrap; gap:8px; align-items:center;";
-    cityInput.parentElement.appendChild(container);
-  }
+  if (!container) return;
 
   const history = getHistory();
   if (history.length === 0) { container.innerHTML = ""; return; }
 
   container.innerHTML = `
-    <span style="font-size:0.75rem; color:#999;">Recent:</span>
+    <span class="history-label">Recent:</span>
     ${history.map(city => `
-      <button onclick="fillCity('${city}')" style="
-        background:#f1f5f9; border:1px solid #e2e8f0; border-radius:20px;
-        padding:3px 12px; font-size:0.78rem; cursor:pointer; color:#555;
-        font-family:inherit; transition:all 0.15s;"
-        onmouseover="this.style.background='#a8dadc';this.style.color='white'"
-        onmouseout="this.style.background='#f1f5f9';this.style.color='#555'">
+      <button onclick="fillCity('${city}')" class="history-chip">
         📍 ${city}
       </button>
     `).join("")}
-    <button onclick="clearHistory()" style="
-      background:none; border:none; font-size:0.72rem;
-      color:#ccc; cursor:pointer; font-family:inherit; padding:0;">✕ clear</button>
+    <button onclick="clearHistory()" class="history-clear">✕ clear</button>
   `;
 }
 
 window.fillCity = function(city) {
-  cityInput.value = city;
+  nlInput.value = `I want to go to ${city}`;
   discoverBtn.classList.add("active");
-  cityInput.focus();
+  nlInput.focus();
+  parseInput(nlInput.value.trim());
 };
 
 window.clearHistory = function() {
@@ -129,8 +203,10 @@ window.clearHistory = function() {
   renderHistory();
 };
 
+// ─────────────────────────────────────────
+// EXCHANGE RATES
+// ─────────────────────────────────────────
 
-// --- Exchange rates ---
 async function loadExchangeRates() {
   try {
     const res = await fetch("https://api.exchangerate-api.com/v4/latest/USD");
@@ -145,11 +221,11 @@ async function loadExchangeRates() {
   }
 }
 
-const sym = (code) => currencySymbols[code] || (code + " ");
-const fmt = (n) => new Intl.NumberFormat(undefined, { maximumFractionDigits: 0 }).format(n);
+const sym  = (code) => currencySymbols[code] || (code + " ");
+const fmt  = (n)    => new Intl.NumberFormat(undefined, { maximumFractionDigits: 0 }).format(n);
 
 function toUserCurrency(usdAmount) {
-  return Math.round(usdAmount * (exchangeRates[currencySelect.value] || 1));
+  return Math.round(usdAmount * (exchangeRates[parsedCurrency] || 1));
 }
 
 function toLocalCurrency(usdAmount) {
@@ -158,56 +234,17 @@ function toLocalCurrency(usdAmount) {
 }
 
 function totalBudgetInUSD() {
-  return parseFloat(budgetRange.value) / (exchangeRates[currencySelect.value] || 1);
+  return parsedBudget / (exchangeRates[parsedCurrency] || 1);
 }
 
 function perNightBudgetInUSD() {
-  return (totalBudgetInUSD() * 0.4) / parseInt(daysRange.value);
+  return (totalBudgetInUSD() * 0.4) / parsedDays;
 }
 
+// ─────────────────────────────────────────
+// BUDGET SUMMARY BAR
+// ─────────────────────────────────────────
 
-// --- Rate badge ---
-function updateRateBadge() {
-  let badge = document.getElementById("rateBadge");
-  if (!badge) {
-    badge = document.createElement("div");
-    badge.id = "rateBadge";
-    badge.style.cssText = "margin-top:6px; font-size:0.8rem; color:#555; line-height:1.8;";
-    currencySelect.parentElement.appendChild(badge);
-  }
-
-  const uc = currencySelect.value;
-  const ur = exchangeRates[uc] || 1;
-  const lines = [];
-
-  if (uc !== "USD") {
-    lines.push(`1 USD = ${ur.toFixed(2)} ${uc}`);
-    lines.push(`1 ${uc} = ${(1/ur).toFixed(4)} USD`);
-  }
-
-  if (localCurrency && localCurrency !== uc) {
-    const lr = exchangeRates[localCurrency] || 1;
-    lines.push(`1 ${uc} = ${(lr/ur).toFixed(2)} ${localCurrency} <em style="color:#aaa">(${localCityName} local)</em>`);
-  }
-
-  badge.innerHTML = lines.join("<br>");
-}
-
-const updateBudgetDisplay = () => {
-  const uc = currencySelect.value;
-  budgetValue.textContent = `${sym(uc)}${fmt(budgetRange.value)}`;
-  budgetText.textContent  = `Total budget: ${sym(uc)}${fmt(budgetRange.value)}`;
-  updateRateBadge();
-
-  if (lastSpots.length > 0 || lastHotels.length > 0) {
-    renderBudgetSummary();
-    if (activeTab === "attractions") renderAttractions();
-    else renderHotels();
-  }
-};
-
-
-// --- Budget summary bar ---
 function renderBudgetSummary() {
   let bar = document.getElementById("budgetSummaryBar");
   if (!bar) {
@@ -221,9 +258,9 @@ function renderBudgetSummary() {
     spotsGrid.before(bar);
   }
 
-  const uc = currencySelect.value;
-  const days = parseInt(daysRange.value);
-  const total = parseFloat(budgetRange.value);
+  const uc    = parsedCurrency;
+  const days  = parsedDays;
+  const total = parsedBudget;
   const daily = total / days;
   const localTotal = localCurrency && localCurrency !== uc
     ? Math.round(totalBudgetInUSD() * (exchangeRates[localCurrency] || 1)) : null;
@@ -237,8 +274,10 @@ function renderBudgetSummary() {
   `;
 }
 
+// ─────────────────────────────────────────
+// TABS
+// ─────────────────────────────────────────
 
-// --- Tabs ---
 function renderTabs() {
   let tabBar = document.getElementById("tabBar");
   if (!tabBar) {
@@ -290,37 +329,27 @@ function switchTab(tab) {
   }
 }
 
-// --- Apply Filter + Sort ---
+// ─────────────────────────────────────────
+// FILTER + SORT
+// ─────────────────────────────────────────
+
 function applyFilterSort(spots) {
   let filtered = [...spots];
-
   if (activeFilter !== "All") {
-    filtered = filtered.filter(s =>
-      (s.type || "").toLowerCase() === activeFilter.toLowerCase()
-    );
+    filtered = filtered.filter(s => (s.type || "").toLowerCase() === activeFilter.toLowerCase());
   }
-
-  if (activeSort === "rating") {
-    filtered.sort((a, b) => (b.rating || 0) - (a.rating || 0));
-  } else if (activeSort === "priceLow") {
-    filtered.sort((a, b) => (a.price || 0) - (b.price || 0));
-  } else if (activeSort === "priceHigh") {
-    filtered.sort((a, b) => (b.price || 0) - (a.price || 0));
-  }
-
+  if (activeSort === "rating")    filtered.sort((a, b) => (b.rating||0) - (a.rating||0));
+  else if (activeSort === "priceLow")  filtered.sort((a, b) => (a.price||0) - (b.price||0));
+  else if (activeSort === "priceHigh") filtered.sort((a, b) => (b.price||0) - (a.price||0));
   return filtered;
 }
 
-
-// --- Filter Bar ---
 function renderFilterBar(spots) {
   let bar = document.getElementById("filterBar");
   if (!bar) {
     bar = document.createElement("div");
     bar.id = "filterBar";
-    bar.style.cssText = `
-      display:flex; flex-wrap:wrap; gap:12px; align-items:center; margin-bottom:20px;
-    `;
+    bar.style.cssText = `display:flex; flex-wrap:wrap; gap:12px; align-items:center; margin-bottom:20px;`;
     spotsGrid.before(bar);
   }
 
@@ -337,45 +366,40 @@ function renderFilterBar(spots) {
       Sort:
       <select id="sortFilter" style="margin-left:6px;padding:7px 10px;border-radius:8px;border:1px solid #ccc;">
         <option value="default" ${activeSort==="default"?"selected":""}>Default</option>
-        <option value="rating" ${activeSort==="rating"?"selected":""}>Highest Rating</option>
-        <option value="priceLow" ${activeSort==="priceLow"?"selected":""}>Lowest Price</option>
+        <option value="rating"  ${activeSort==="rating"?"selected":""}>Highest Rating</option>
+        <option value="priceLow"  ${activeSort==="priceLow"?"selected":""}>Lowest Price</option>
         <option value="priceHigh" ${activeSort==="priceHigh"?"selected":""}>Highest Price</option>
       </select>
     </label>
   `;
 
-  document.getElementById("typeFilter").addEventListener("change", (e) => {
-    activeFilter = e.target.value;
-    renderAttractions();
-  });
-
-  document.getElementById("sortFilter").addEventListener("change", (e) => {
-    activeSort = e.target.value;
-    renderAttractions();
-  });
+  document.getElementById("typeFilter").addEventListener("change", e => { activeFilter = e.target.value; renderAttractions(); });
+  document.getElementById("sortFilter").addEventListener("change", e => { activeSort   = e.target.value; renderAttractions(); });
 }
 
+// ─────────────────────────────────────────
+// RENDER ATTRACTIONS
+// ─────────────────────────────────────────
 
-// --- Render Attractions ---
 function renderAttractions() {
   spotsGrid.innerHTML = "";
   showOverBudget = false;
 
-  const uc        = currencySelect.value;
+  const uc        = parsedCurrency;
   const budgetUSD = totalBudgetInUSD();
 
   renderFilterBar(lastSpots);
 
   const filtered   = applyFilterSort(lastSpots);
   const affordable = filtered.filter(s => s.price === 0 || s.price <= budgetUSD);
-  const tooExp     = filtered.filter(s => s.price > 0 && s.price > budgetUSD);
+  const tooExp     = filtered.filter(s => s.price > 0   && s.price > budgetUSD);
 
-  resultsCount.textContent = `${lastSpots.length} attractions found · ${affordable.length} within your ${sym(uc)}${fmt(budgetRange.value)} budget`;
+  resultsCount.textContent = `${lastSpots.length} attractions found · ${affordable.length} within your ${sym(uc)}${fmt(parsedBudget)} budget`;
 
   if (affordable.length === 0 && lastSpots.length > 0) {
     const msg = document.createElement("div");
     msg.style.cssText = "grid-column:1/-1; text-align:center; padding:30px; color:#666;";
-    msg.innerHTML = `<p>😅 No attractions fit your current budget. Try increasing it or switching currency.</p>`;
+    msg.innerHTML = `<p>😅 No attractions fit your current budget. Try increasing it.</p>`;
     spotsGrid.appendChild(msg);
   }
 
@@ -388,9 +412,9 @@ function renderAttractions() {
     toggle.innerHTML = `
       <button onclick="toggleOverBudget()" style="
         background:none; border:1px dashed #ccc; color:#888; padding:8px 20px;
-        border-radius:20px; cursor:pointer; font-size:0.85rem; font-family:inherit;
-      ">Show ${tooExp.length} attraction${tooExp.length>1?"s":""} over budget ▾</button>
-    `;
+        border-radius:20px; cursor:pointer; font-size:0.85rem; font-family:inherit;">
+        Show ${tooExp.length} attraction${tooExp.length>1?"s":""} over budget ▾
+      </button>`;
     spotsGrid.appendChild(toggle);
 
     const hiddenSection = document.createElement("div");
@@ -399,12 +423,7 @@ function renderAttractions() {
 
     const subGrid = document.createElement("div");
     subGrid.style.cssText = "display:grid; grid-template-columns:repeat(auto-fill,minmax(280px,1fr)); gap:20px;";
-
-    tooExp.forEach(spot => {
-      const card = buildSpotCard(spot, true);
-      subGrid.appendChild(card);
-    });
-
+    tooExp.forEach(spot => subGrid.appendChild(buildSpotCard(spot, true)));
     hiddenSection.appendChild(subGrid);
     spotsGrid.appendChild(hiddenSection);
   }
@@ -420,9 +439,8 @@ window.toggleOverBudget = function() {
     : `Show ${section.querySelectorAll(".spot-card").length} attractions over budget ▾`;
 };
 
-
 function buildSpotCard(spot, dimmed) {
-  const uc = currencySelect.value;
+  const uc = parsedCurrency;
   const lc = localCurrency;
 
   const userPrice   = spot.price === 0 ? 0 : toUserCurrency(spot.price);
@@ -436,11 +454,7 @@ function buildSpotCard(spot, dimmed) {
 
   const card = document.createElement("div");
   card.className = "spot-card";
-
-  if (dimmed) {
-    card.style.opacity = "0.5";
-    card.style.filter = "grayscale(30%)";
-  }
+  if (dimmed) { card.style.opacity = "0.5"; card.style.filter = "grayscale(30%)"; }
 
   card.innerHTML = `
     <div class="card-header"><span class="card-icon">${spot.image}</span></div>
@@ -466,28 +480,23 @@ function renderSpotCard(spot, dimmed) {
   spotsGrid.appendChild(buildSpotCard(spot, dimmed));
 }
 
+// ─────────────────────────────────────────
+// RENDER HOTELS
+// ─────────────────────────────────────────
 
-// --- Render Hotels ---
 function renderHotels() {
   spotsGrid.innerHTML = "";
 
-  const uc = currencySelect.value;
-  const lc = localCurrency;
-  const days = parseInt(daysRange.value);
+  const uc              = parsedCurrency;
+  const lc              = localCurrency;
+  const days            = parsedDays;
   const nightlyBudgetUSD = perNightBudgetInUSD();
 
   const affordable = lastHotels.filter(h => h.price_per_night <= nightlyBudgetUSD);
-  const tooExp     = lastHotels.filter(h => h.price_per_night > nightlyBudgetUSD);
+  const tooExp     = lastHotels.filter(h => h.price_per_night >  nightlyBudgetUSD);
 
   const nightlyUser = toUserCurrency(nightlyBudgetUSD);
   resultsCount.textContent = `${lastHotels.length} hotels found · ${affordable.length} fit your nightly budget (${sym(uc)}${fmt(nightlyUser)}/night)`;
-
-  if (affordable.length === 0 && lastHotels.length > 0) {
-    const msg = document.createElement("div");
-    msg.style.cssText = "grid-column:1/-1; text-align:center; padding:30px; color:#666;";
-    msg.innerHTML = `<p>😅 No hotels fit your nightly budget. Try a higher budget or fewer days.</p>`;
-    spotsGrid.appendChild(msg);
-  }
 
   const renderHotelCard = (hotel, dimmed) => {
     const nightlyUser  = toUserCurrency(hotel.price_per_night);
@@ -496,11 +505,7 @@ function renderHotels() {
 
     const card = document.createElement("div");
     card.className = "spot-card";
-
-    if (dimmed) {
-      card.style.opacity = "0.5";
-      card.style.filter = "grayscale(30%)";
-    }
+    if (dimmed) { card.style.opacity = "0.5"; card.style.filter = "grayscale(30%)"; }
 
     card.innerHTML = `
       <div class="card-header">
@@ -539,220 +544,19 @@ function renderHotels() {
   }
 }
 
-
-// --- Add hotel to trip ---
-window.addHotelToTrip = function(button) {
-  const name  = button.getAttribute("data-name");
-  const price = button.getAttribute("data-price");
-  const trip  = JSON.parse(localStorage.getItem("myTrip")) || [];
-
-  if (trip.some(s => s.name === `🏨 ${name}`)) {
-    button.textContent = "Already saved!";
-    button.style.backgroundColor = "#f59e0b";
-    return;
-  }
-
-  trip.push({ name: `🏨 ${name}`, price });
-  localStorage.setItem("myTrip", JSON.stringify(trip));
-
-  button.textContent = "✓ Saved!";
-  button.style.backgroundColor = "#2ecc71";
-  button.disabled = true;
-};
-
-
-// --- Add attraction to trip ---
-window.addToItinerary = function(button) {
-  const name  = button.getAttribute("data-name");
-  const price = button.getAttribute("data-price");
-  const trip  = JSON.parse(localStorage.getItem("myTrip")) || [];
-
-  if (trip.some(s => s.name === name)) {
-    button.textContent = "Already added!";
-    button.style.backgroundColor = "#f59e0b";
-    return;
-  }
-
-  trip.push({ name, price });
-  localStorage.setItem("myTrip", JSON.stringify(trip));
-
-  button.textContent = "✓ Added!";
-  button.style.backgroundColor = "#2ecc71";
-  button.disabled = true;
-};
-
-
-// --- Robust JSON parser ---
-function safeParseArray(text) {
-  text = text.replace(/```json/gi, "").replace(/```/g, "").trim();
-
-  try { return JSON.parse(text); } catch (_) {}
-
-  let lastBrace = -1;
-  let depth = 0;
-  let inString = false;
-  let escape = false;
-
-  for (let i = 0; i < text.length; i++) {
-    const ch = text[i];
-    if (escape) { escape = false; continue; }
-    if (ch === "\\") { escape = true; continue; }
-    if (ch === '"') { inString = !inString; continue; }
-    if (inString) continue;
-    if (ch === "{") depth++;
-    if (ch === "}") {
-      depth--;
-      if (depth === 0) lastBrace = i;
-    }
-  }
-
-  if (lastBrace === -1) return [];
-
-  const trimmed = text.substring(0, lastBrace + 1) + "]";
-  const fixed = trimmed.startsWith("[") ? trimmed : "[" + trimmed;
-
-  try { return JSON.parse(fixed); } catch (_) { return []; }
-}
-
-
-// --- Fetch Attractions ---
-async function fetchAttractions(city) {
-  spotsGrid.innerHTML = `<div style="grid-column:1/-1;text-align:center;padding:40px;">
-    <div class="spinner"></div><p>Finding attractions in ${city}…</p></div>`;
-
-  try {
-    const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1/models/gemini-2.5-flash:generateContent?key=${API_KEY}`,
-      {
-        method:"POST",
-        headers:{"Content-Type":"application/json"},
-        body: JSON.stringify({
-          contents:[{parts:[{
-            text:`You are a travel API. List up to 30 real tourist attractions, landmarks, museums, markets, parks, and activities in ${city}.
-All "price" values MUST be in USD. Use 0 for free entry.
-Return ONLY a raw JSON array, no markdown, no backticks, no explanation.
-Keep each desc under 15 words. Compact format required.
-[{"name":"Name","type":"Category","rating":4.5,"reviews":"10k","price":5,"image":"Emoji","desc":"Short description."}]`
-          }]}],
-          generationConfig:{ temperature:0.3, maxOutputTokens:4096 }
-        })
-      }
-    );
-
-    const data = await res.json();
-    if (data.error) throw new Error(data.error.message);
-
-    let text = data.candidates[0].content.parts[0].text;
-    text = text.replace(/```json/gi,"").replace(/```/g,"").trim();
-
-    lastSpots = safeParseArray(text);
-    activeFilter = "All";
-    activeSort   = "default";
-
-    renderBudgetSummary();
-    renderTabs();
-    renderAttractions();
-
-  } catch(err) {
-    console.error(err);
-    spotsGrid.innerHTML = `<div style="grid-column:1/-1;text-align:center;color:#e74c3c;padding:40px;">
-      <h3>Could not load attractions</h3><p>${err.message}</p></div>`;
-  }
-}
-
-
-// --- Fetch Hotels ---
-async function fetchHotels(city) {
-  spotsGrid.innerHTML = `<div style="grid-column:1/-1;text-align:center;padding:40px;">
-    <div class="spinner"></div><p>Finding hotels in ${city}…</p></div>`;
-
-  try {
-    const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1/models/gemini-2.5-flash:generateContent?key=${API_KEY}`,
-      {
-        method:"POST",
-        headers:{"Content-Type":"application/json"},
-        body: JSON.stringify({
-          contents:[{parts:[{
-            text:`You are a hotel search API. List 20 real hotels in ${city} across budget, mid-range, and luxury tiers.
-All "price_per_night" values MUST be in USD.
-Return ONLY a raw JSON array, no markdown, no backticks, no explanation.
-Keep each desc under 15 words. Compact format required.
-[{"name":"Hotel Name","stars":4,"area":"Neighbourhood","rating":4.5,"reviews":"2k","price_per_night":80,"desc":"Short description."}]`
-          }]}],
-          generationConfig:{ temperature:0.3, maxOutputTokens:3000 }
-        })
-      }
-    );
-
-    const data = await res.json();
-    if (data.error) throw new Error(data.error.message);
-
-    let text = data.candidates[0].content.parts[0].text;
-    text = text.replace(/```json/gi,"").replace(/```/g,"").trim();
-
-    lastHotels = safeParseArray(text);
-    renderTabs();
-    renderHotels();
-
-  } catch(err) {
-    console.error(err);
-    spotsGrid.innerHTML = `<div style="grid-column:1/-1;text-align:center;color:#e74c3c;padding:40px;">
-      <h3>Could not load hotels</h3><p>${err.message}</p></div>`;
-  }
-}
-
-async function fetchRestaurants(city) {
-  spotsGrid.innerHTML = `<div style="grid-column:1/-1;text-align:center;padding:40px;">
-    <div class="spinner"></div><p>Finding restaurants in ${city}…</p></div>`;
-
-  try {
-    const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1/models/gemini-2.5-flash:generateContent?key=${API_KEY}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text:
-            `You are a restaurant search API. List 20 real restaurants in ${city} across budget, mid-range, and fine dining tiers.
-All "price_per_person" values MUST be in USD (average meal cost per person).
-Return ONLY a raw JSON array, no markdown, no backticks, no explanation.
-Keep each desc under 15 words. Compact format required.
-[{"name":"Restaurant Name","cuisine":"Cuisine Type","area":"Neighbourhood","rating":4.5,"reviews":"2k","price_per_person":15,"must_try":"Signature dish name","image":"🍜","desc":"Short description."}]`
-          }] }],
-          generationConfig: { temperature: 0.3, maxOutputTokens: 3000 }
-        })
-      }
-    );
-
-    const data = await res.json();
-    if (data.error) throw new Error(data.error.message);
-
-    let text = data.candidates[0].content.parts[0].text;
-    text = text.replace(/```json/gi, "").replace(/```/g, "").trim();
-
-    lastRestaurants = safeParseArray(text);
-    renderTabs();
-    renderRestaurants();
-
-  } catch (err) {
-    console.error(err);
-    spotsGrid.innerHTML = `<div style="grid-column:1/-1;text-align:center;color:#e74c3c;padding:40px;">
-      <h3>Could not load restaurants</h3><p>${err.message}</p></div>`;
-  }
-}
+// ─────────────────────────────────────────
+// RENDER RESTAURANTS
+// ─────────────────────────────────────────
 
 function renderRestaurants() {
   spotsGrid.innerHTML = "";
 
-  const uc = currencySelect.value;
-  const lc = localCurrency;
-  const budgetUSD = totalBudgetInUSD();
-  // Use 10% of total budget as a per-meal budget threshold
-  const mealBudgetUSD = budgetUSD * 0.10;
+  const uc           = parsedCurrency;
+  const lc           = localCurrency;
+  const mealBudgetUSD = totalBudgetInUSD() * 0.10;
 
   const affordable = lastRestaurants.filter(r => r.price_per_person <= mealBudgetUSD);
-  const tooExp     = lastRestaurants.filter(r => r.price_per_person > mealBudgetUSD);
+  const tooExp     = lastRestaurants.filter(r => r.price_per_person >  mealBudgetUSD);
 
   const mealBudgetUser = toUserCurrency(mealBudgetUSD);
   resultsCount.textContent = `${lastRestaurants.length} restaurants found · ${affordable.length} within ~${sym(uc)}${fmt(mealBudgetUser)}/person meal budget`;
@@ -764,7 +568,7 @@ function renderRestaurants() {
     spotsGrid.appendChild(msg);
   }
 
-  const renderRestaurantCard = (r, dimmed) => {
+  const renderCard = (r, dimmed) => {
     const priceUser  = toUserCurrency(r.price_per_person);
     const priceLocal = lc && lc !== uc ? toLocalCurrency(r.price_per_person) : null;
 
@@ -797,68 +601,218 @@ function renderRestaurants() {
     spotsGrid.appendChild(card);
   };
 
-  affordable.forEach(r => renderRestaurantCard(r, false));
+  affordable.forEach(r => renderCard(r, false));
 
   if (tooExp.length > 0) {
     const divider = document.createElement("div");
     divider.style.cssText = "grid-column:1/-1; text-align:center; color:#aaa; font-size:0.85rem; padding:8px 0; border-top:1px dashed #ddd;";
     divider.textContent = `⬇️ ${tooExp.length} restaurant${tooExp.length > 1 ? "s" : ""} over your meal budget`;
     spotsGrid.appendChild(divider);
-    tooExp.forEach(r => renderRestaurantCard(r, true));
+    tooExp.forEach(r => renderCard(r, true));
   }
 }
 
+// ─────────────────────────────────────────
+// ITINERARY HELPERS
+// ─────────────────────────────────────────
 
-// --- Discover button ---
-discoverBtn.addEventListener("click", () => {
-  const rawCity = cityInput.value.trim();
-  if (!rawCity) { alert("Please enter a city!"); return; }
+window.addHotelToTrip = function(button) {
+  const name  = button.getAttribute("data-name");
+  const price = button.getAttribute("data-price");
+  const trip  = JSON.parse(localStorage.getItem("myTrip")) || [];
+  if (trip.some(s => s.name === `🏨 ${name}`)) {
+    button.textContent = "Already saved!"; button.style.backgroundColor = "#f59e0b"; return;
+  }
+  trip.push({ name: `🏨 ${name}`, price });
+  localStorage.setItem("myTrip", JSON.stringify(trip));
+  button.textContent = "✓ Saved!"; button.style.backgroundColor = "#2ecc71"; button.disabled = true;
+};
 
-  localStorage.setItem("selectedDays", daysRange.value);
-  localStorage.setItem("tripBudget", budgetRange.value);
-  localStorage.setItem("lastSearchedCity", rawCity); 
+window.addToItinerary = function(button) {
+  const name  = button.getAttribute("data-name");
+  const price = button.getAttribute("data-price");
+  const trip  = JSON.parse(localStorage.getItem("myTrip")) || [];
+  if (trip.some(s => s.name === name)) {
+    button.textContent = "Already added!"; button.style.backgroundColor = "#f59e0b"; return;
+  }
+  trip.push({ name, price });
+  localStorage.setItem("myTrip", JSON.stringify(trip));
+  button.textContent = "✓ Added!"; button.style.backgroundColor = "#2ecc71"; button.disabled = true;
+};
+
+// ─────────────────────────────────────────
+// JSON PARSER
+// ─────────────────────────────────────────
+
+function safeParseArray(text) {
+  text = text.replace(/```json/gi, "").replace(/```/g, "").trim();
+  try { return JSON.parse(text); } catch (_) {}
+
+  let lastBrace = -1, depth = 0, inString = false, escape = false;
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (escape) { escape = false; continue; }
+    if (ch === "\\") { escape = true; continue; }
+    if (ch === '"') { inString = !inString; continue; }
+    if (inString) continue;
+    if (ch === "{") depth++;
+    if (ch === "}") { depth--; if (depth === 0) lastBrace = i; }
+  }
+  if (lastBrace === -1) return [];
+  const trimmed = text.substring(0, lastBrace + 1) + "]";
+  const fixed = trimmed.startsWith("[") ? trimmed : "[" + trimmed;
+  try { return JSON.parse(fixed); } catch (_) { return []; }
+}
+
+// ─────────────────────────────────────────
+// FETCH FUNCTIONS
+// ─────────────────────────────────────────
+
+async function fetchAttractions(city) {
+  spotsGrid.innerHTML = `<div style="grid-column:1/-1;text-align:center;padding:40px;">
+    <div class="spinner"></div><p>Finding attractions in ${city}…</p></div>`;
+
+  try {
+    const res = await fetch(
+      `https://generativelanguage.googleapis.com/v1/models/gemini-2.5-flash:generateContent?key=${API_KEY}`,
+      {
+        method:"POST", headers:{"Content-Type":"application/json"},
+        body: JSON.stringify({
+          contents:[{parts:[{text:
+            `You are a travel API. List up to 30 real tourist attractions, landmarks, museums, markets, parks, and activities in ${city}.
+All "price" values MUST be in USD. Use 0 for free entry.
+Return ONLY a raw JSON array, no markdown, no backticks, no explanation.
+Keep each desc under 15 words. Compact format required.
+[{"name":"Name","type":"Category","rating":4.5,"reviews":"10k","price":5,"image":"Emoji","desc":"Short description."}]`
+          }]}],
+          generationConfig:{ temperature:0.3, maxOutputTokens:4096 }
+        })
+      }
+    );
+    const data = await res.json();
+    if (data.error) throw new Error(data.error.message);
+    let text = data.candidates[0].content.parts[0].text;
+    lastSpots = safeParseArray(text);
+    activeFilter = "All"; activeSort = "default";
+    renderBudgetSummary(); renderTabs(); renderAttractions();
+  } catch(err) {
+    console.error(err);
+    spotsGrid.innerHTML = `<div style="grid-column:1/-1;text-align:center;color:#e74c3c;padding:40px;">
+      <h3>Could not load attractions</h3><p>${err.message}</p></div>`;
+  }
+}
+
+async function fetchHotels(city) {
+  spotsGrid.innerHTML = `<div style="grid-column:1/-1;text-align:center;padding:40px;">
+    <div class="spinner"></div><p>Finding hotels in ${city}…</p></div>`;
+
+  try {
+    const res = await fetch(
+      `https://generativelanguage.googleapis.com/v1/models/gemini-2.5-flash:generateContent?key=${API_KEY}`,
+      {
+        method:"POST", headers:{"Content-Type":"application/json"},
+        body: JSON.stringify({
+          contents:[{parts:[{text:
+            `You are a hotel search API. List 20 real hotels in ${city} across budget, mid-range, and luxury tiers.
+All "price_per_night" values MUST be in USD.
+Return ONLY a raw JSON array, no markdown, no backticks, no explanation.
+Keep each desc under 15 words. Compact format required.
+[{"name":"Hotel Name","stars":4,"area":"Neighbourhood","rating":4.5,"reviews":"2k","price_per_night":80,"desc":"Short description."}]`
+          }]}],
+          generationConfig:{ temperature:0.3, maxOutputTokens:3000 }
+        })
+      }
+    );
+    const data = await res.json();
+    if (data.error) throw new Error(data.error.message);
+    let text = data.candidates[0].content.parts[0].text;
+    lastHotels = safeParseArray(text);
+    renderTabs(); renderHotels();
+  } catch(err) {
+    console.error(err);
+    spotsGrid.innerHTML = `<div style="grid-column:1/-1;text-align:center;color:#e74c3c;padding:40px;">
+      <h3>Could not load hotels</h3><p>${err.message}</p></div>`;
+  }
+}
+
+async function fetchRestaurants(city) {
+  spotsGrid.innerHTML = `<div style="grid-column:1/-1;text-align:center;padding:40px;">
+    <div class="spinner"></div><p>Finding restaurants in ${city}…</p></div>`;
+
+  try {
+    const res = await fetch(
+      `https://generativelanguage.googleapis.com/v1/models/gemini-2.5-flash:generateContent?key=${API_KEY}`,
+      {
+        method:"POST", headers:{"Content-Type":"application/json"},
+        body: JSON.stringify({
+          contents:[{parts:[{text:
+            `You are a restaurant search API. List 20 real restaurants in ${city} across budget, mid-range, and fine dining tiers.
+All "price_per_person" values MUST be in USD (average meal cost per person).
+Return ONLY a raw JSON array, no markdown, no backticks, no explanation.
+Keep each desc under 15 words. Compact format required.
+[{"name":"Restaurant Name","cuisine":"Cuisine Type","area":"Neighbourhood","rating":4.5,"reviews":"2k","price_per_person":15,"must_try":"Signature dish name","image":"🍜","desc":"Short description."}]`
+          }]}],
+          generationConfig:{ temperature:0.3, maxOutputTokens:3000 }
+        })
+      }
+    );
+    const data = await res.json();
+    if (data.error) throw new Error(data.error.message);
+    let text = data.candidates[0].content.parts[0].text;
+    lastRestaurants = safeParseArray(text);
+    renderTabs(); renderRestaurants();
+  } catch(err) {
+    console.error(err);
+    spotsGrid.innerHTML = `<div style="grid-column:1/-1;text-align:center;color:#e74c3c;padding:40px;">
+      <h3>Could not load restaurants</h3><p>${err.message}</p></div>`;
+  }
+}
+
+// ─────────────────────────────────────────
+// DISCOVER BUTTON
+// ─────────────────────────────────────────
+
+discoverBtn.addEventListener("click", async () => {
+  const rawInput = nlInput.value.trim();
+  if (!rawInput) { alert("Tell us where you want to go!"); return; }
+
+  // If parsing hasn't run yet (short input / fast click), parse now
+  if (!parsedCity) {
+    discoverBtn.textContent = "Parsing…";
+    discoverBtn.disabled = true;
+    await parseInput(rawInput);
+    discoverBtn.textContent = "Discover Best Spots";
+    discoverBtn.disabled = false;
+  }
+
+  const rawCity = parsedCity || rawInput;
+
+  localStorage.setItem("selectedDays",      parsedDays);
+  localStorage.setItem("tripBudget",        parsedBudget);
+  localStorage.setItem("lastSearchedCity",  rawCity);
 
   saveToHistory(rawCity);
 
   localCityName = rawCity;
   localCurrency = detectLocalCurrency(rawCity);
 
-  lastSpots  = [];
-  lastHotels = [];
-  lastRestaurants = []; 
-  activeTab  = "attractions";
-  activeFilter = "All";
-  activeSort   = "default";
+  lastSpots = []; lastHotels = []; lastRestaurants = [];
+  activeTab = "attractions"; activeFilter = "All"; activeSort = "default";
 
   resultsSection.style.display = "block";
   resultsTitle.textContent  = `Best Spots in ${rawCity}`;
-  statDays.textContent      = `${daysRange.value} days`;
-  statBudget.textContent    = `${sym(currencySelect.value)}${fmt(budgetRange.value)}`;
-  statCurrency.textContent  = currencySelect.value;
+  statDays.textContent      = `${parsedDays} days`;
+  statBudget.textContent    = `${sym(parsedCurrency)}${fmt(parsedBudget)}`;
+  statCurrency.textContent  = parsedCurrency;
   resultsCount.textContent  = "Loading…";
 
-  updateRateBadge();
   fetchAttractions(rawCity);
   resultsSection.scrollIntoView({ behavior:"smooth" });
 });
 
+// ─────────────────────────────────────────
+// BOOT
+// ─────────────────────────────────────────
 
-// --- Listeners ---
-daysRange.addEventListener("input", e => {
-  daysValue.textContent = e.target.value;
-  daysText.textContent  = e.target.value === "1" ? "1 day" : `${e.target.value} days`;
-  localStorage.setItem("selectedDays", e.target.value);
-  updateBudgetDisplay();
-});
-
-budgetRange.addEventListener("input", updateBudgetDisplay);
-currencySelect.addEventListener("change", updateBudgetDisplay);
-
-cityInput.addEventListener("input", () => {
-  discoverBtn.classList.toggle("active", cityInput.value.trim().length > 0);
-});
-
-
-// --- Boot ---
-loadExchangeRates().then(updateBudgetDisplay);
+loadExchangeRates();
 renderHistory();
