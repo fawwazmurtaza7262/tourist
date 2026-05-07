@@ -1,25 +1,20 @@
-console.log("Destination JS loaded");
+console.log("Destination JS loaded — OpenRouter");
 
-const API_KEY = CONFIG.API_KEY;
+// ─── OpenRouter API ───
+const OPENROUTER_KEY = CONFIG.OPENROUTER_KEY;
+const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
+const AI_MODEL = "openai/gpt-4o-mini";
 
-// --- Element Selection ---
-const nlInput        = document.getElementById("nlInput");
-const parseState     = document.getElementById("parseState");
-const parsedSummary  = document.getElementById("parsedSummary");
-const chipCity       = document.getElementById("chipCity");
-const chipDates      = document.getElementById("chipDates");
-const chipBudget     = document.getElementById("chipBudget");
-const chipCurrency   = document.getElementById("chipCurrency");
-const discoverBtn    = document.getElementById("discoverBtn");
-const resultsSection = document.getElementById("resultsSection");
-const resultsTitle   = document.getElementById("resultsTitle");
-const resultsCount   = document.getElementById("resultsCount");
-const statDays       = document.getElementById("statDays");
-const statBudget     = document.getElementById("statBudget");
-const statCurrency   = document.getElementById("statCurrency");
-const spotsGrid      = document.getElementById("spotsGrid");
+// ─── Element refs ───
+const nlInput       = document.getElementById("nlInput");
+const parsedSummary = document.getElementById("parsedSummary");
+const chipCity      = document.getElementById("chipCity");
+const chipDates     = document.getElementById("chipDates");
+const chipBudget    = document.getElementById("chipBudget");
+const chipCurrency  = document.getElementById("chipCurrency");
+const discoverBtn   = document.getElementById("discoverBtn");
 
-// --- Currency config ---
+// ─── Currency config ───
 const currencySymbols = {
   USD:"$", EUR:"€", GBP:"£", CAD:"CA$", AUD:"A$",
   JPY:"¥", CHF:"CHF ", PKR:"₨", AED:"AED ", INR:"₹",
@@ -27,792 +22,559 @@ const currencySymbols = {
   THB:"฿", TRY:"₺", ZAR:"R", SEK:"kr", NOK:"kr"
 };
 
-// --- State ---
-let exchangeRates   = {};
-let lastSpots       = [];
-let lastHotels      = [];
-let lastRestaurants = [];
-let localCurrency   = null;
-let localCityName   = "";
-let showOverBudget  = false;
-let activeTab       = "attractions";
-let activeFilter    = "All";
-let activeSort      = "default";
-
-// Parsed trip params (replaces sliders/dropdowns)
-let parsedCity     = "";
-let parsedDays     = 3;
-let parsedBudget   = 5000;   // in user currency
-let parsedCurrency = "USD";
+// ─── State ───
+let parsedCity       = "";
+let parsedDays       = 3;
+let parsedBudget     = 5000;
+let parsedCurrency   = "USD";
 let parsedDatesLabel = "";
+let editingItinerary = null;
+let chatHistory      = [];
+let isGenerating     = false;
 
-// --- City → currency map ---
-const cityToCurrency = {
-  lahore:"PKR", karachi:"PKR", islamabad:"PKR", rawalpindi:"PKR", peshawar:"PKR",
-  mumbai:"INR", delhi:"INR", bangalore:"INR", chennai:"INR", hyderabad:"INR", kolkata:"INR",
-  dhaka:"BDT", colombo:"LKR", kathmandu:"NPR",
-  dubai:"AED", abudhabi:"AED", sharjah:"AED", riyadh:"SAR", jeddah:"SAR",
-  doha:"QAR", kuwait:"KWD", muscat:"OMR", amman:"JOD", telaviv:"ILS", jerusalem:"ILS",
-  london:"GBP", manchester:"GBP", edinburgh:"GBP",
-  paris:"EUR", berlin:"EUR", rome:"EUR", madrid:"EUR", amsterdam:"EUR",
-  barcelona:"EUR", vienna:"EUR", athens:"EUR", lisbon:"EUR", brussels:"EUR",
-  zurich:"CHF", geneva:"CHF", stockholm:"SEK", oslo:"NOK", copenhagen:"DKK",
-  warsaw:"PLN", budapest:"HUF", prague:"CZK",
-  newyork:"USD", losangeles:"USD", chicago:"USD", houston:"USD", miami:"USD",
-  toronto:"CAD", vancouver:"CAD", montreal:"CAD", calgary:"CAD",
-  mexicocity:"MXN", cancun:"MXN", saopaulo:"BRL", rio:"BRL",
-  tokyo:"JPY", osaka:"JPY", kyoto:"JPY",
-  beijing:"CNY", shanghai:"CNY", seoul:"KRW", singapore:"SGD",
-  bangkok:"THB", jakarta:"IDR", bali:"IDR",
-  sydney:"AUD", melbourne:"AUD", auckland:"NZD",
-  cairo:"EGP", capetown:"ZAR", johannesburg:"ZAR",
-};
+// ─── OpenRouter helper with auto-retry ───
+async function callAI(systemPrompt, userPrompt, maxTokens = 4096) {
+  if (!OPENROUTER_KEY || OPENROUTER_KEY === "YOUR_OPENROUTER_KEY_HERE") {
+    throw new Error("NO_KEY: Please add your OpenRouter API key to js/config.js");
+  }
 
-function getCityKey(raw) { return raw.toLowerCase().replace(/[\s\-'\.]/g, ""); }
-function detectLocalCurrency(raw) { return cityToCurrency[getCityKey(raw)] || null; }
+  const MAX_RETRIES = 3;
+  let fallbackDelayMs = 5000;
 
-// ─────────────────────────────────────────
-// NL PARSING via Gemini
-// ─────────────────────────────────────────
+  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+    const res = await fetch(OPENROUTER_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${OPENROUTER_KEY}`,
+        "HTTP-Referer": window.location.href,
+        "X-Title": "Tourist Planner"
+      },
+      body: JSON.stringify({
+        model: AI_MODEL,
+        max_tokens: maxTokens,
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt }
+        ]
+      })
+    });
 
+    let data = {};
+    try {
+      data = await res.json();
+    } catch {
+      data = {};
+    }
+
+    const retryAfterRaw = res.headers.get("Retry-After");
+    const retryAfterSec = retryAfterRaw ? Number(retryAfterRaw) : NaN;
+
+    if (!res.ok || data.error) {
+      const msg = data?.error?.message || `HTTP ${res.status}`;
+
+      if (
+        res.status === 401 ||
+        data?.error?.code === 401 ||
+        msg.toLowerCase().includes("auth") ||
+        msg.toLowerCase().includes("key")
+      ) {
+        throw new Error("NO_KEY: Invalid API key. Check your key at openrouter.ai/keys");
+      }
+
+      if (res.status === 429 || data?.error?.code === 429) {
+        if (attempt < MAX_RETRIES) {
+          const waitMs = Number.isFinite(retryAfterSec) && retryAfterSec > 0
+            ? retryAfterSec * 1000
+            : fallbackDelayMs;
+
+          updateLoadingLabel(`Rate limited — waiting ${Math.round(waitMs / 1000)}s, then retrying… (${attempt}/${MAX_RETRIES})`);
+          await new Promise(r => setTimeout(r, waitMs));
+          fallbackDelayMs = Math.min(fallbackDelayMs * 2, 30000);
+          continue;
+        }
+        throw new Error("RATE: Still rate limited after several retries. Please wait and try again.");
+      }
+
+      throw new Error(msg);
+    }
+
+    const text = data.choices?.[0]?.message?.content;
+    if (!text) throw new Error("Empty response. Please try again.");
+    return text;
+  }
+}
+
+function parseJSON(raw) {
+  return JSON.parse(raw.replace(/```json/gi,"").replace(/```/g,"").trim());
+}
+
+// ─── NL Parsing (regex — no AI calls wasted) ───
 let parseDebounce = null;
-
 nlInput.addEventListener("input", () => {
   const val = nlInput.value.trim();
-  discoverBtn.classList.toggle("active", val.length > 5);
-  parsedSummary.style.display = "none";
-  parseState.textContent = "";
-
+  discoverBtn.classList.toggle("active", val.length > 3);
   clearTimeout(parseDebounce);
-  if (val.length < 8) return;
-
-  parseDebounce = setTimeout(() => parseInput(val), 700);
+  if (val.length < 3) { parsedSummary.style.display = "none"; return; }
+  parseDebounce = setTimeout(() => parseInput(val), 400);
 });
 
-async function parseInput(text) {
-  parseState.innerHTML = `<span class="parsing-dot"></span> Parsing…`;
+function parseInput(text) {
+  const lower = text.toLowerCase();
 
-  try {
-    const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1/models/gemini-2.5-flash:generateContent?key=${API_KEY}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text:
-            `Extract trip details from this user input: "${text}"
-
-Return ONLY a raw JSON object, no markdown, no backticks:
-{
-  "city": "City name or empty string",
-  "days": number of days as integer (calculate from dates if given, default 3),
-  "budget": budget amount as number (default 5000 if not mentioned),
-  "currency": "3-letter currency code, infer from city if not stated (e.g. Toronto → CAD, London → GBP, default USD)",
-  "datesLabel": "human-readable date range like 'May 11–16' or empty string"
-}` }] }],
-          generationConfig: { temperature: 0.1, maxOutputTokens: 200 }
-        })
-      }
-    );
-
-    const data = await res.json();
-    if (data.error) throw new Error(data.error.message);
-
-    let raw = data.candidates[0].content.parts[0].text;
-    raw = raw.replace(/```json/gi, "").replace(/```/g, "").trim();
-    const parsed = JSON.parse(raw);
-
-    parsedCity     = parsed.city     || "";
-    parsedDays     = Math.max(1, parseInt(parsed.days) || 3);
-    parsedBudget   = parseFloat(parsed.budget) || 5000;
-    parsedCurrency = (parsed.currency || "USD").toUpperCase();
-    parsedDatesLabel = parsed.datesLabel || "";
-
-    if (!currencySymbols[parsedCurrency]) parsedCurrency = "USD";
-
-    showParsedSummary();
-    parseState.textContent = "";
-
-  } catch (err) {
-    console.warn("Parse error:", err);
-    parseState.textContent = "";
+  const cityMatch = text.match(
+    /(?:go(?:ing)?\s+to|trip\s+to|visit(?:ing)?|travel(?:ling)?\s+to|in|fly(?:ing)?\s+to|heading\s+to)\s+([A-Z][a-zA-Z\s\-]{1,30}?)(?=\s+(?:for|from|with|on|\d)|[,.]|$)/i
+  );
+  parsedCity = cityMatch ? cityMatch[1].trim().replace(/\s+/g," ") : "";
+  if (!parsedCity) {
+    const cap = text.match(/\b([A-Z][a-zA-Z]+(?:\s+[A-Z][a-zA-Z]+)?)\b/);
+    if (cap) parsedCity = cap[1];
   }
+
+  const daysMatch = lower.match(/(\d+)\s*day/);
+  const weekMatch = lower.match(/(\d+)\s*week/);
+  const aWeek     = lower.includes("a week") || lower.includes("one week");
+  parsedDays = daysMatch ? parseInt(daysMatch[1])
+             : weekMatch ? parseInt(weekMatch[1]) * 7
+             : aWeek     ? 7 : 3;
+  parsedDays = Math.max(1, Math.min(parsedDays, 30));
+
+  const budgetMatch = text.match(/[£$€₨₹¥]?\s*(\d[\d,]*(?:\.\d+)?)\s*(k)?\b/i);
+  if (budgetMatch) {
+    let val = parseFloat(budgetMatch[1].replace(/,/g,""));
+    if (budgetMatch[2]) val *= 1000;
+    parsedBudget = val > 0 ? val : 5000;
+  } else {
+    parsedBudget = 5000;
+  }
+
+  if      (text.includes("£") || lower.includes("pound"))   parsedCurrency = "GBP";
+  else if (text.includes("€") || lower.includes("euro"))    parsedCurrency = "EUR";
+  else if (text.includes("₨") || lower.includes("pkr") || lower.includes("rupee")) parsedCurrency = "PKR";
+  else if (text.includes("₹") || lower.includes("inr"))     parsedCurrency = "INR";
+  else if (text.includes("¥") || lower.includes("yen"))     parsedCurrency = "JPY";
+  else if (lower.includes("cad") || lower.includes("canadian")) parsedCurrency = "CAD";
+  else if (lower.includes("aud") || lower.includes("australian")) parsedCurrency = "AUD";
+  else                                                        parsedCurrency = "USD";
+
+  const dateMatch = text.match(/(?:from\s+)?([A-Z][a-z]+\s+\d{1,2})(?:\s*[-–to]+\s*(?:[A-Z][a-z]+\s*)?\d{1,2})?/);
+  parsedDatesLabel = dateMatch ? dateMatch[0].replace(/^from\s+/i,"").trim() : "";
+
+  if (parsedCity) showParsedSummary();
+  else parsedSummary.style.display = "none";
 }
 
 function showParsedSummary() {
   if (!parsedCity && !parsedDays) return;
-
-  const sym = currencySymbols[parsedCurrency] || parsedCurrency + " ";
-
-  chipCity.innerHTML     = parsedCity     ? `📍 <strong>${parsedCity}</strong>` : "";
-  chipDates.innerHTML    = parsedDatesLabel ? `📅 <strong>${parsedDatesLabel}</strong> · ${parsedDays} day${parsedDays>1?"s":""}` : `📅 <strong>${parsedDays} day${parsedDays>1?"s":""}</strong>`;
+  const sym = currencySymbols[parsedCurrency] || parsedCurrency+" ";
+  chipCity.innerHTML     = parsedCity ? `📍 <strong>${parsedCity}</strong>` : "";
+  chipDates.innerHTML    = parsedDatesLabel
+    ? `📅 <strong>${parsedDatesLabel}</strong> · ${parsedDays} day${parsedDays>1?"s":""}`
+    : `📅 <strong>${parsedDays} day${parsedDays>1?"s":""}</strong>`;
   chipBudget.innerHTML   = `💰 <strong>${sym}${parsedBudget.toLocaleString()}</strong>`;
   chipCurrency.innerHTML = `🌐 <strong>${parsedCurrency}</strong>`;
-
   chipCity.style.display     = parsedCity ? "" : "none";
-  chipDates.style.display    = parsedDays ? "" : "none";
+  chipDates.style.display    = parsedDays  ? "" : "none";
   chipBudget.style.display   = "";
   chipCurrency.style.display = "";
-
   parsedSummary.style.display = "flex";
 }
 
-// ─────────────────────────────────────────
-// SEARCH HISTORY
-// ─────────────────────────────────────────
-
-function getHistory() {
-  return JSON.parse(localStorage.getItem("searchHistory")) || [];
+// ─── Search History ───
+function getHistory(){ return JSON.parse(localStorage.getItem("searchHistory"))||[]; }
+function saveToHistory(city){
+  let h = getHistory().filter(c=>c.toLowerCase()!==city.toLowerCase());
+  h.unshift(city); h=h.slice(0,6);
+  localStorage.setItem("searchHistory", JSON.stringify(h));
 }
-
-function saveToHistory(city) {
-  let history = getHistory();
-  history = history.filter(c => c.toLowerCase() !== city.toLowerCase());
-  history.unshift(city);
-  history = history.slice(0, 6);
-  localStorage.setItem("searchHistory", JSON.stringify(history));
-}
-
-function renderHistory() {
-  let container = document.getElementById("searchHistory");
+function renderHistory(){
+  const container = document.getElementById("searchHistory");
   if (!container) return;
-
   const history = getHistory();
-  if (history.length === 0) { container.innerHTML = ""; return; }
-
-  container.innerHTML = `
-    <span class="history-label">Recent:</span>
-    ${history.map(city => `
-      <button onclick="fillCity('${city}')" class="history-chip">
-        📍 ${city}
-      </button>
-    `).join("")}
-    <button onclick="clearHistory()" class="history-clear">✕ clear</button>
-  `;
+  if (!history.length){ container.innerHTML=""; return; }
+  container.innerHTML = `<span class="history-label">Recent:</span>
+    ${history.map(city=>`<button onclick="fillCity('${city.replace(/'/g, "\\'")}')" class="history-chip">📍 ${city}</button>`).join("")}
+    <button onclick="clearHistory()" class="history-clear">✕ clear</button>`;
 }
-
-window.fillCity = function(city) {
+window.fillCity = function(city){
   nlInput.value = `I want to go to ${city}`;
   discoverBtn.classList.add("active");
   nlInput.focus();
   parseInput(nlInput.value.trim());
 };
-
-window.clearHistory = function() {
+window.clearHistory = function(){
   localStorage.removeItem("searchHistory");
   renderHistory();
 };
 
-// ─────────────────────────────────────────
-// EXCHANGE RATES
-// ─────────────────────────────────────────
+// ─── Discover Button ───
+discoverBtn.addEventListener("click", () => {
+  if (isGenerating) return;
 
-async function loadExchangeRates() {
-  try {
-    const res = await fetch("https://api.exchangerate-api.com/v4/latest/USD");
-    exchangeRates = (await res.json()).rates;
-  } catch {
-    exchangeRates = {
-      USD:1, CAD:1.36, EUR:0.92, GBP:0.79, AUD:1.52, JPY:149,
-      CHF:0.90, PKR:278, INR:83, AED:3.67, MXN:17, BRL:4.97,
-      KRW:1325, CNY:7.24, SGD:1.34, THB:35, TRY:30, ZAR:18.6,
-      SEK:10.4, NOK:10.6, EGP:30.9, SAR:3.75, QAR:3.64
-    };
-  }
-}
-
-const sym  = (code) => currencySymbols[code] || (code + " ");
-const fmt  = (n)    => new Intl.NumberFormat(undefined, { maximumFractionDigits: 0 }).format(n);
-
-function toUserCurrency(usdAmount) {
-  return Math.round(usdAmount * (exchangeRates[parsedCurrency] || 1));
-}
-
-function toLocalCurrency(usdAmount) {
-  if (!localCurrency || !exchangeRates[localCurrency]) return null;
-  return Math.round(usdAmount * exchangeRates[localCurrency]);
-}
-
-function totalBudgetInUSD() {
-  return parsedBudget / (exchangeRates[parsedCurrency] || 1);
-}
-
-function perNightBudgetInUSD() {
-  return (totalBudgetInUSD() * 0.4) / parsedDays;
-}
-
-// ─────────────────────────────────────────
-// BUDGET SUMMARY BAR
-// ─────────────────────────────────────────
-
-function renderBudgetSummary() {
-  let bar = document.getElementById("budgetSummaryBar");
-  if (!bar) {
-    bar = document.createElement("div");
-    bar.id = "budgetSummaryBar";
-    bar.style.cssText = `
-      background:#f0f9ff; border:1px solid #a8dadc; border-radius:10px;
-      padding:14px 20px; margin-bottom:20px;
-      display:flex; flex-wrap:wrap; gap:16px; font-size:0.88rem; color:#333;
-    `;
-    spotsGrid.before(bar);
-  }
-
-  const uc    = parsedCurrency;
-  const days  = parsedDays;
-  const total = parsedBudget;
-  const daily = total / days;
-  const localTotal = localCurrency && localCurrency !== uc
-    ? Math.round(totalBudgetInUSD() * (exchangeRates[localCurrency] || 1)) : null;
-
-  bar.innerHTML = `
-    <div>🗓️ <strong>${days} day${days>1?"s":""}</strong></div>
-    <div>💰 Total: <strong>${sym(uc)}${fmt(total)}</strong></div>
-    <div>📅 Per day: <strong>${sym(uc)}${fmt(daily)}</strong></div>
-    <div>💱 <strong>${uc}</strong></div>
-    ${localTotal ? `<div>🏙️ ≈ <strong>${sym(localCurrency)}${fmt(localTotal)}</strong> ${localCurrency} total</div>` : ""}
-  `;
-}
-
-// ─────────────────────────────────────────
-// TABS
-// ─────────────────────────────────────────
-
-function renderTabs() {
-  let tabBar = document.getElementById("tabBar");
-  if (!tabBar) {
-    tabBar = document.createElement("div");
-    tabBar.id = "tabBar";
-    tabBar.style.cssText = `
-      display:flex; gap:0; margin-bottom:24px;
-      border-radius:10px; overflow:hidden;
-      border:1px solid #a8dadc; width:fit-content;
-    `;
-    spotsGrid.before(tabBar);
-  }
-
-  tabBar.innerHTML = `
-    <button onclick="switchTab('attractions')" style="
-      padding:10px 24px; border:none; cursor:pointer; font-size:0.9rem; font-weight:600;
-      background:${activeTab==="attractions" ? "#a8dadc" : "#fff"};
-      color:${activeTab==="attractions" ? "#fff" : "#555"};
-      font-family:inherit; transition:all 0.2s;
-    ">🗺️ Attractions</button>
-    <button onclick="switchTab('hotels')" style="
-      padding:10px 24px; border:none; cursor:pointer; font-size:0.9rem; font-weight:600;
-      background:${activeTab==="hotels" ? "#a8dadc" : "#fff"};
-      color:${activeTab==="hotels" ? "#fff" : "#555"};
-      font-family:inherit; transition:all 0.2s; border-left:1px solid #a8dadc;
-    ">🏨 Hotels</button>
-    <button onclick="switchTab('restaurants')" style="
-      padding:10px 24px; border:none; cursor:pointer; font-size:0.9rem; font-weight:600;
-      background:${activeTab==="restaurants" ? "#a8dadc" : "#fff"};
-      color:${activeTab==="restaurants" ? "#fff" : "#555"};
-      font-family:inherit; transition:all 0.2s; border-left:1px solid #a8dadc;
-    ">🍽️ Restaurants</button>
-  `;
-}
-
-function switchTab(tab) {
-  activeTab = tab;
-  renderTabs();
-
-  if (tab === "attractions") {
-    if (lastSpots.length > 0) renderAttractions();
-    else fetchAttractions(localCityName);
-  } else if (tab === "hotels") {
-    if (lastHotels.length > 0) renderHotels();
-    else fetchHotels(localCityName);
-  } else {
-    if (lastRestaurants.length > 0) renderRestaurants();
-    else fetchRestaurants(localCityName);
-  }
-}
-
-// ─────────────────────────────────────────
-// FILTER + SORT
-// ─────────────────────────────────────────
-
-function applyFilterSort(spots) {
-  let filtered = [...spots];
-  if (activeFilter !== "All") {
-    filtered = filtered.filter(s => (s.type || "").toLowerCase() === activeFilter.toLowerCase());
-  }
-  if (activeSort === "rating")    filtered.sort((a, b) => (b.rating||0) - (a.rating||0));
-  else if (activeSort === "priceLow")  filtered.sort((a, b) => (a.price||0) - (b.price||0));
-  else if (activeSort === "priceHigh") filtered.sort((a, b) => (b.price||0) - (a.price||0));
-  return filtered;
-}
-
-function renderFilterBar(spots) {
-  let bar = document.getElementById("filterBar");
-  if (!bar) {
-    bar = document.createElement("div");
-    bar.id = "filterBar";
-    bar.style.cssText = `display:flex; flex-wrap:wrap; gap:12px; align-items:center; margin-bottom:20px;`;
-    spotsGrid.before(bar);
-  }
-
-  const types = ["All", ...new Set(spots.map(s => s.type).filter(Boolean))];
-
-  bar.innerHTML = `
-    <label style="font-size:0.85rem;color:#555;">
-      Filter:
-      <select id="typeFilter" style="margin-left:6px;padding:7px 10px;border-radius:8px;border:1px solid #ccc;">
-        ${types.map(t => `<option value="${t}" ${t===activeFilter?"selected":""}>${t}</option>`).join("")}
-      </select>
-    </label>
-    <label style="font-size:0.85rem;color:#555;">
-      Sort:
-      <select id="sortFilter" style="margin-left:6px;padding:7px 10px;border-radius:8px;border:1px solid #ccc;">
-        <option value="default" ${activeSort==="default"?"selected":""}>Default</option>
-        <option value="rating"  ${activeSort==="rating"?"selected":""}>Highest Rating</option>
-        <option value="priceLow"  ${activeSort==="priceLow"?"selected":""}>Lowest Price</option>
-        <option value="priceHigh" ${activeSort==="priceHigh"?"selected":""}>Highest Price</option>
-      </select>
-    </label>
-  `;
-
-  document.getElementById("typeFilter").addEventListener("change", e => { activeFilter = e.target.value; renderAttractions(); });
-  document.getElementById("sortFilter").addEventListener("change", e => { activeSort   = e.target.value; renderAttractions(); });
-}
-
-// ─────────────────────────────────────────
-// RENDER ATTRACTIONS
-// ─────────────────────────────────────────
-
-function renderAttractions() {
-  spotsGrid.innerHTML = "";
-  showOverBudget = false;
-
-  const uc        = parsedCurrency;
-  const budgetUSD = totalBudgetInUSD();
-
-  renderFilterBar(lastSpots);
-
-  const filtered   = applyFilterSort(lastSpots);
-  const affordable = filtered.filter(s => s.price === 0 || s.price <= budgetUSD);
-  const tooExp     = filtered.filter(s => s.price > 0   && s.price > budgetUSD);
-
-  resultsCount.textContent = `${lastSpots.length} attractions found · ${affordable.length} within your ${sym(uc)}${fmt(parsedBudget)} budget`;
-
-  if (affordable.length === 0 && lastSpots.length > 0) {
-    const msg = document.createElement("div");
-    msg.style.cssText = "grid-column:1/-1; text-align:center; padding:30px; color:#666;";
-    msg.innerHTML = `<p>😅 No attractions fit your current budget. Try increasing it.</p>`;
-    spotsGrid.appendChild(msg);
-  }
-
-  affordable.forEach(spot => renderSpotCard(spot, false));
-
-  if (tooExp.length > 0) {
-    const toggle = document.createElement("div");
-    toggle.id = "overBudgetToggle";
-    toggle.style.cssText = "grid-column:1/-1; text-align:center; margin:16px 0 8px;";
-    toggle.innerHTML = `
-      <button onclick="toggleOverBudget()" style="
-        background:none; border:1px dashed #ccc; color:#888; padding:8px 20px;
-        border-radius:20px; cursor:pointer; font-size:0.85rem; font-family:inherit;">
-        Show ${tooExp.length} attraction${tooExp.length>1?"s":""} over budget ▾
-      </button>`;
-    spotsGrid.appendChild(toggle);
-
-    const hiddenSection = document.createElement("div");
-    hiddenSection.id = "overBudgetSection";
-    hiddenSection.style.cssText = "display:none; grid-column:1/-1;";
-
-    const subGrid = document.createElement("div");
-    subGrid.style.cssText = "display:grid; grid-template-columns:repeat(auto-fill,minmax(280px,1fr)); gap:20px;";
-    tooExp.forEach(spot => subGrid.appendChild(buildSpotCard(spot, true)));
-    hiddenSection.appendChild(subGrid);
-    spotsGrid.appendChild(hiddenSection);
-  }
-}
-
-window.toggleOverBudget = function() {
-  const section = document.getElementById("overBudgetSection");
-  const btn     = document.querySelector("#overBudgetToggle button");
-  showOverBudget = !showOverBudget;
-  section.style.display = showOverBudget ? "block" : "none";
-  btn.textContent = showOverBudget
-    ? "Hide over-budget attractions ▴"
-    : `Show ${section.querySelectorAll(".spot-card").length} attractions over budget ▾`;
-};
-
-function buildSpotCard(spot, dimmed) {
-  const uc = parsedCurrency;
-  const lc = localCurrency;
-
-  const userPrice   = spot.price === 0 ? 0 : toUserCurrency(spot.price);
-  const userDisplay = spot.price === 0 ? "FREE" : `${sym(uc)}${fmt(userPrice)}`;
-
-  let localLine = "";
-  if (lc && lc !== uc && spot.price > 0) {
-    const lp = toLocalCurrency(spot.price);
-    if (lp) localLine = `<small style="color:#888;display:block;margin-top:2px;">${sym(lc)}${fmt(lp)} ${lc}</small>`;
-  }
-
-  const card = document.createElement("div");
-  card.className = "spot-card";
-  if (dimmed) { card.style.opacity = "0.5"; card.style.filter = "grayscale(30%)"; }
-
-  card.innerHTML = `
-    <div class="card-header"><span class="card-icon">${spot.image}</span></div>
-    <div class="card-body">
-      <h3>${spot.name}</h3>
-      <div class="rating">⭐ ${spot.rating} <span style="color:#999">(${spot.reviews})</span></div>
-      <p>${spot.desc}</p>
-      <div class="price-box">
-        <span>ENTRY PRICE${dimmed ? ' <span style="font-size:0.7rem;color:#e74c3c;">over budget</span>' : ''}</span>
-        <strong style="color:${spot.price===0?"#2ecc71":"#3498db"}">${userDisplay}</strong>
-        ${localLine}
-      </div>
-      <button class="learn-btn" onclick="addToItinerary(this)"
-        data-name="${spot.name}" data-price="${userDisplay}"
-        ${dimmed ? 'style="background:#ccc;"' : ""}>
-        + Add to Itinerary
-      </button>
-    </div>`;
-  return card;
-}
-
-function renderSpotCard(spot, dimmed) {
-  spotsGrid.appendChild(buildSpotCard(spot, dimmed));
-}
-
-// ─────────────────────────────────────────
-// RENDER HOTELS
-// ─────────────────────────────────────────
-
-function renderHotels() {
-  spotsGrid.innerHTML = "";
-
-  const uc              = parsedCurrency;
-  const lc              = localCurrency;
-  const days            = parsedDays;
-  const nightlyBudgetUSD = perNightBudgetInUSD();
-
-  const affordable = lastHotels.filter(h => h.price_per_night <= nightlyBudgetUSD);
-  const tooExp     = lastHotels.filter(h => h.price_per_night >  nightlyBudgetUSD);
-
-  const nightlyUser = toUserCurrency(nightlyBudgetUSD);
-  resultsCount.textContent = `${lastHotels.length} hotels found · ${affordable.length} fit your nightly budget (${sym(uc)}${fmt(nightlyUser)}/night)`;
-
-  const renderHotelCard = (hotel, dimmed) => {
-    const nightlyUser  = toUserCurrency(hotel.price_per_night);
-    const totalUser    = nightlyUser * days;
-    const nightlyLocal = lc && lc !== uc ? toLocalCurrency(hotel.price_per_night) : null;
-
-    const card = document.createElement("div");
-    card.className = "spot-card";
-    if (dimmed) { card.style.opacity = "0.5"; card.style.filter = "grayscale(30%)"; }
-
-    card.innerHTML = `
-      <div class="card-header">
-        <span class="card-icon">${hotel.stars >= 5 ? "🏩" : hotel.stars >= 4 ? "🏨" : "🏠"}</span>
-        <div style="margin-top:6px;">${"⭐".repeat(Math.min(hotel.stars||3, 5))}</div>
-      </div>
-      <div class="card-body">
-        <h3>${hotel.name}</h3>
-        <div style="font-size:0.82rem; color:#888; margin-bottom:6px;">📍 ${hotel.area || localCityName}</div>
-        <div class="rating">⭐ ${hotel.rating} <span style="color:#999">(${hotel.reviews})</span></div>
-        <p>${hotel.desc}</p>
-        <div class="price-box">
-          <span>PER NIGHT${dimmed ? ' <span style="font-size:0.7rem;color:#e74c3c;">over nightly budget</span>' : ''}</span>
-          <strong style="color:#3498db">${sym(uc)}${fmt(nightlyUser)}</strong>
-          ${nightlyLocal ? `<small style="color:#888;display:block;margin-top:2px;">${sym(lc)}${fmt(nightlyLocal)} ${lc}/night</small>` : ""}
-          <small style="color:#aaa;display:block;margin-top:4px;">${days} night${days>1?"s":""} total: <strong>${sym(uc)}${fmt(totalUser)}</strong></small>
-        </div>
-        <button class="learn-btn" onclick="addHotelToTrip(this)"
-          data-name="${hotel.name}"
-          data-price="${sym(uc)}${fmt(nightlyUser)}/night"
-          ${dimmed ? 'style="background:#ccc;"' : ""}>
-          + Save Hotel
-        </button>
-      </div>`;
-    spotsGrid.appendChild(card);
-  };
-
-  affordable.forEach(h => renderHotelCard(h, false));
-
-  if (tooExp.length > 0) {
-    const divider = document.createElement("div");
-    divider.style.cssText = "grid-column:1/-1; text-align:center; color:#aaa; font-size:0.85rem; padding:8px 0; border-top:1px dashed #ddd;";
-    divider.textContent = `⬇️ ${tooExp.length} hotel${tooExp.length>1?"s":""} over your nightly budget`;
-    spotsGrid.appendChild(divider);
-    tooExp.forEach(h => renderHotelCard(h, true));
-  }
-}
-
-// ─────────────────────────────────────────
-// RENDER RESTAURANTS
-// ─────────────────────────────────────────
-
-function renderRestaurants() {
-  spotsGrid.innerHTML = "";
-
-  const uc           = parsedCurrency;
-  const lc           = localCurrency;
-  const mealBudgetUSD = totalBudgetInUSD() * 0.10;
-
-  const affordable = lastRestaurants.filter(r => r.price_per_person <= mealBudgetUSD);
-  const tooExp     = lastRestaurants.filter(r => r.price_per_person >  mealBudgetUSD);
-
-  const mealBudgetUser = toUserCurrency(mealBudgetUSD);
-  resultsCount.textContent = `${lastRestaurants.length} restaurants found · ${affordable.length} within ~${sym(uc)}${fmt(mealBudgetUser)}/person meal budget`;
-
-  if (affordable.length === 0 && lastRestaurants.length > 0) {
-    const msg = document.createElement("div");
-    msg.style.cssText = "grid-column:1/-1; text-align:center; padding:30px; color:#666;";
-    msg.innerHTML = `<p>😅 No restaurants fit your current budget. Try increasing it.</p>`;
-    spotsGrid.appendChild(msg);
-  }
-
-  const renderCard = (r, dimmed) => {
-    const priceUser  = toUserCurrency(r.price_per_person);
-    const priceLocal = lc && lc !== uc ? toLocalCurrency(r.price_per_person) : null;
-
-    const card = document.createElement("div");
-    card.className = "spot-card";
-    if (dimmed) { card.style.opacity = "0.5"; card.style.filter = "grayscale(30%)"; }
-
-    card.innerHTML = `
-      <div class="card-header"><span class="card-icon">${r.image || "🍽️"}</span></div>
-      <div class="card-body">
-        <h3>${r.name}</h3>
-        <div style="font-size:0.82rem; color:#e67e22; font-weight:600; margin-bottom:4px;">🍴 ${r.cuisine || "Restaurant"}</div>
-        <div style="font-size:0.82rem; color:#888; margin-bottom:6px;">📍 ${r.area || localCityName}</div>
-        <div class="rating">⭐ ${r.rating} <span style="color:#999">(${r.reviews})</span></div>
-        <p>${r.desc}</p>
-        ${r.must_try ? `<div style="font-size:0.82rem; background:#fff8f0; border-left:3px solid #e67e22; padding:5px 8px; margin:8px 0; border-radius:0 6px 6px 0; color:#c0392b;">
-          🌟 Must try: <strong>${r.must_try}</strong>
-        </div>` : ""}
-        <div class="price-box">
-          <span>PER PERSON${dimmed ? ' <span style="font-size:0.7rem;color:#e74c3c;">over meal budget</span>' : ''}</span>
-          <strong style="color:#e67e22">${sym(uc)}${fmt(priceUser)}</strong>
-          ${priceLocal ? `<small style="color:#888;display:block;margin-top:2px;">${sym(lc)}${fmt(priceLocal)} ${lc}/person</small>` : ""}
-        </div>
-        <button class="learn-btn" onclick="addToItinerary(this)"
-          data-name="${r.name}" data-price="${sym(uc)}${fmt(priceUser)}/person"
-          ${dimmed ? 'style="background:#ccc;"' : ""}>
-          + Add to Itinerary
-        </button>
-      </div>`;
-    spotsGrid.appendChild(card);
-  };
-
-  affordable.forEach(r => renderCard(r, false));
-
-  if (tooExp.length > 0) {
-    const divider = document.createElement("div");
-    divider.style.cssText = "grid-column:1/-1; text-align:center; color:#aaa; font-size:0.85rem; padding:8px 0; border-top:1px dashed #ddd;";
-    divider.textContent = `⬇️ ${tooExp.length} restaurant${tooExp.length > 1 ? "s" : ""} over your meal budget`;
-    spotsGrid.appendChild(divider);
-    tooExp.forEach(r => renderCard(r, true));
-  }
-}
-
-// ─────────────────────────────────────────
-// ITINERARY HELPERS
-// ─────────────────────────────────────────
-
-window.addHotelToTrip = function(button) {
-  const name  = button.getAttribute("data-name");
-  const price = button.getAttribute("data-price");
-  const trip  = JSON.parse(localStorage.getItem("myTrip")) || [];
-  if (trip.some(s => s.name === `🏨 ${name}`)) {
-    button.textContent = "Already saved!"; button.style.backgroundColor = "#f59e0b"; return;
-  }
-  trip.push({ name: `🏨 ${name}`, price });
-  localStorage.setItem("myTrip", JSON.stringify(trip));
-  button.textContent = "✓ Saved!"; button.style.backgroundColor = "#2ecc71"; button.disabled = true;
-};
-
-window.addToItinerary = function(button) {
-  const name  = button.getAttribute("data-name");
-  const price = button.getAttribute("data-price");
-  const trip  = JSON.parse(localStorage.getItem("myTrip")) || [];
-  if (trip.some(s => s.name === name)) {
-    button.textContent = "Already added!"; button.style.backgroundColor = "#f59e0b"; return;
-  }
-  trip.push({ name, price });
-  localStorage.setItem("myTrip", JSON.stringify(trip));
-  button.textContent = "✓ Added!"; button.style.backgroundColor = "#2ecc71"; button.disabled = true;
-};
-
-// ─────────────────────────────────────────
-// JSON PARSER
-// ─────────────────────────────────────────
-
-function safeParseArray(text) {
-  text = text.replace(/```json/gi, "").replace(/```/g, "").trim();
-  try { return JSON.parse(text); } catch (_) {}
-
-  let lastBrace = -1, depth = 0, inString = false, escape = false;
-  for (let i = 0; i < text.length; i++) {
-    const ch = text[i];
-    if (escape) { escape = false; continue; }
-    if (ch === "\\") { escape = true; continue; }
-    if (ch === '"') { inString = !inString; continue; }
-    if (inString) continue;
-    if (ch === "{") depth++;
-    if (ch === "}") { depth--; if (depth === 0) lastBrace = i; }
-  }
-  if (lastBrace === -1) return [];
-  const trimmed = text.substring(0, lastBrace + 1) + "]";
-  const fixed = trimmed.startsWith("[") ? trimmed : "[" + trimmed;
-  try { return JSON.parse(fixed); } catch (_) { return []; }
-}
-
-// ─────────────────────────────────────────
-// FETCH FUNCTIONS
-// ─────────────────────────────────────────
-
-async function fetchAttractions(city) {
-  spotsGrid.innerHTML = `<div style="grid-column:1/-1;text-align:center;padding:40px;">
-    <div class="spinner"></div><p>Finding attractions in ${city}…</p></div>`;
-
-  try {
-    const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1/models/gemini-2.5-flash:generateContent?key=${API_KEY}`,
-      {
-        method:"POST", headers:{"Content-Type":"application/json"},
-        body: JSON.stringify({
-          contents:[{parts:[{text:
-            `You are a travel API. List up to 30 real tourist attractions, landmarks, museums, markets, parks, and activities in ${city}.
-All "price" values MUST be in USD. Use 0 for free entry.
-Return ONLY a raw JSON array, no markdown, no backticks, no explanation.
-Keep each desc under 15 words. Compact format required.
-[{"name":"Name","type":"Category","rating":4.5,"reviews":"10k","price":5,"image":"Emoji","desc":"Short description."}]`
-          }]}],
-          generationConfig:{ temperature:0.3, maxOutputTokens:4096 }
-        })
-      }
-    );
-    const data = await res.json();
-    if (data.error) throw new Error(data.error.message);
-    let text = data.candidates[0].content.parts[0].text;
-    lastSpots = safeParseArray(text);
-    activeFilter = "All"; activeSort = "default";
-    renderBudgetSummary(); renderTabs(); renderAttractions();
-  } catch(err) {
-    console.error(err);
-    spotsGrid.innerHTML = `<div style="grid-column:1/-1;text-align:center;color:#e74c3c;padding:40px;">
-      <h3>Could not load attractions</h3><p>${err.message}</p></div>`;
-  }
-}
-
-async function fetchHotels(city) {
-  spotsGrid.innerHTML = `<div style="grid-column:1/-1;text-align:center;padding:40px;">
-    <div class="spinner"></div><p>Finding hotels in ${city}…</p></div>`;
-
-  try {
-    const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1/models/gemini-2.5-flash:generateContent?key=${API_KEY}`,
-      {
-        method:"POST", headers:{"Content-Type":"application/json"},
-        body: JSON.stringify({
-          contents:[{parts:[{text:
-            `You are a hotel search API. List 20 real hotels in ${city} across budget, mid-range, and luxury tiers.
-All "price_per_night" values MUST be in USD.
-Return ONLY a raw JSON array, no markdown, no backticks, no explanation.
-Keep each desc under 15 words. Compact format required.
-[{"name":"Hotel Name","stars":4,"area":"Neighbourhood","rating":4.5,"reviews":"2k","price_per_night":80,"desc":"Short description."}]`
-          }]}],
-          generationConfig:{ temperature:0.3, maxOutputTokens:3000 }
-        })
-      }
-    );
-    const data = await res.json();
-    if (data.error) throw new Error(data.error.message);
-    let text = data.candidates[0].content.parts[0].text;
-    lastHotels = safeParseArray(text);
-    renderTabs(); renderHotels();
-  } catch(err) {
-    console.error(err);
-    spotsGrid.innerHTML = `<div style="grid-column:1/-1;text-align:center;color:#e74c3c;padding:40px;">
-      <h3>Could not load hotels</h3><p>${err.message}</p></div>`;
-  }
-}
-
-async function fetchRestaurants(city) {
-  spotsGrid.innerHTML = `<div style="grid-column:1/-1;text-align:center;padding:40px;">
-    <div class="spinner"></div><p>Finding restaurants in ${city}…</p></div>`;
-
-  try {
-    const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1/models/gemini-2.5-flash:generateContent?key=${API_KEY}`,
-      {
-        method:"POST", headers:{"Content-Type":"application/json"},
-        body: JSON.stringify({
-          contents:[{parts:[{text:
-            `You are a restaurant search API. List 20 real restaurants in ${city} across budget, mid-range, and fine dining tiers.
-All "price_per_person" values MUST be in USD (average meal cost per person).
-Return ONLY a raw JSON array, no markdown, no backticks, no explanation.
-Keep each desc under 15 words. Compact format required.
-[{"name":"Restaurant Name","cuisine":"Cuisine Type","area":"Neighbourhood","rating":4.5,"reviews":"2k","price_per_person":15,"must_try":"Signature dish name","image":"🍜","desc":"Short description."}]`
-          }]}],
-          generationConfig:{ temperature:0.3, maxOutputTokens:3000 }
-        })
-      }
-    );
-    const data = await res.json();
-    if (data.error) throw new Error(data.error.message);
-    let text = data.candidates[0].content.parts[0].text;
-    lastRestaurants = safeParseArray(text);
-    renderTabs(); renderRestaurants();
-  } catch(err) {
-    console.error(err);
-    spotsGrid.innerHTML = `<div style="grid-column:1/-1;text-align:center;color:#e74c3c;padding:40px;">
-      <h3>Could not load restaurants</h3><p>${err.message}</p></div>`;
-  }
-}
-
-// ─────────────────────────────────────────
-// DISCOVER BUTTON
-// ─────────────────────────────────────────
-
-discoverBtn.addEventListener("click", async () => {
   const rawInput = nlInput.value.trim();
-  if (!rawInput) { alert("Tell us where you want to go!"); return; }
+  if (!rawInput){ alert("Tell us where you want to go!"); return; }
 
-  // If parsing hasn't run yet (short input / fast click), parse now
-  if (!parsedCity) {
-    discoverBtn.textContent = "Parsing…";
-    discoverBtn.disabled = true;
-    await parseInput(rawInput);
-    discoverBtn.textContent = "Discover Best Spots";
-    discoverBtn.disabled = false;
-  }
-
+  if (!parsedCity) parseInput(rawInput);
   const rawCity = parsedCity || rawInput;
+  if (!rawCity) { alert("Please enter a destination."); return; }
 
-  localStorage.setItem("selectedDays",      parsedDays);
-  localStorage.setItem("tripBudget",        parsedBudget);
-  localStorage.setItem("lastSearchedCity",  rawCity);
+  isGenerating = true;
+  discoverBtn.disabled = true;
+  discoverBtn.textContent = "Generating…";
 
+  localStorage.setItem("selectedDays", parsedDays);
+  localStorage.setItem("tripBudget", parsedBudget);
+  localStorage.setItem("lastSearchedCity", rawCity);
+  localStorage.setItem("tripCurrency", parsedCurrency);
+  localStorage.setItem("tripDatesLabel", parsedDatesLabel);
   saveToHistory(rawCity);
 
-  localCityName = rawCity;
-  localCurrency = detectLocalCurrency(rawCity);
-
-  lastSpots = []; lastHotels = []; lastRestaurants = [];
-  activeTab = "attractions"; activeFilter = "All"; activeSort = "default";
-
-  resultsSection.style.display = "block";
-  resultsTitle.textContent  = `Best Spots in ${rawCity}`;
-  statDays.textContent      = `${parsedDays} days`;
-  statBudget.textContent    = `${sym(parsedCurrency)}${fmt(parsedBudget)}`;
-  statCurrency.textContent  = parsedCurrency;
-  resultsCount.textContent  = "Loading…";
-
-  fetchAttractions(rawCity);
-  resultsSection.scrollIntoView({ behavior:"smooth" });
+  showLoadingSection(rawCity);
 });
 
-// ─────────────────────────────────────────
-// BOOT
-// ─────────────────────────────────────────
+// ══════════════════════════════════════════════
+// STEP 1 — GENERATE ITINERARY
+// ══════════════════════════════════════════════
 
-loadExchangeRates();
+function showLoadingSection(city) {
+  let section = document.getElementById("itineraryGenSection");
+  if (!section) {
+    section = document.createElement("section");
+    section.id = "itineraryGenSection";
+    section.className = "itinerary-gen-section";
+    document.querySelector(".search-container").insertAdjacentElement("afterend", section);
+  }
+  const sym = currencySymbols[parsedCurrency] || parsedCurrency+" ";
+  section.style.display = "block";
+  section.innerHTML = `
+    <div class="itin-gen-header">
+      <div class="itin-gen-eyebrow">✨ AI Itinerary Planner</div>
+      <h2 class="itin-gen-title">Building your itinerary for <em>${city}</em></h2>
+      <p class="itin-gen-sub">${parsedDays} day${parsedDays>1?"s":""} · ${sym}${parsedBudget.toLocaleString()} ${parsedCurrency}${parsedDatesLabel?" · "+parsedDatesLabel:""}</p>
+    </div>
+    <div class="single-loading-wrap">
+      <div class="single-loading-card">
+        <div class="spinner"></div>
+        <p class="loading-label">Crafting your personalised itinerary…</p>
+      </div>
+    </div>
+  `;
+  section.scrollIntoView({ behavior:"smooth" });
+  generateItinerary(city);
+}
+
+async function generateItinerary(city) {
+  const sym = currencySymbols[parsedCurrency] || parsedCurrency+" ";
+  try {
+    const raw = await callAI(
+      "You are an expert travel planner. Always respond with ONLY a raw JSON object — no markdown, no backticks, no explanation.",
+      `Create a ${parsedDays}-day itinerary for ${city} with a budget of ${sym}${parsedBudget} ${parsedCurrency}.
+
+Return ONLY this JSON structure:
+{
+  "title": "Trip to ${city}",
+  "emoji": "✈️",
+  "tagline": "One compelling sentence about this trip",
+  "highlights": ["highlight1", "highlight2", "highlight3"],
+  "estimatedCost": "${sym}XXXX",
+  "days": [
+    {
+      "day": 1,
+      "theme": "Arrival & First Impressions",
+      "activities": [
+        { "time": "9:00 AM", "name": "Name", "desc": "Under 10 words", "cost": "${sym}0", "type": "attraction" }
+      ]
+    }
+  ]
+}
+Generate exactly ${parsedDays} days, 4-5 activities each. Types: attraction, food, transport, hotel. Pick a fitting emoji for ${city}.`,
+      4096
+    );
+
+    const itin = parseJSON(raw);
+    document.getElementById("itineraryGenSection").style.display = "none";
+    editingItinerary = itin;
+    chatHistory = [];
+    showEditor();
+  } catch(err) {
+    console.error("Generation error:", err);
+    showGenerationError(city, err.message);
+  } finally {
+    isGenerating = false;
+    discoverBtn.disabled = false;
+    discoverBtn.textContent = "Generate Itinerary";
+  }
+}
+
+function updateLoadingLabel(text) {
+  const label = document.querySelector(".loading-label");
+  if (label) label.textContent = text;
+}
+
+function showGenerationError(city, errMsg = "") {
+  const wrap = document.querySelector(".single-loading-wrap");
+  if (!wrap) return;
+
+  const isNoKey  = errMsg.startsWith("NO_KEY:");
+  const isRate   = errMsg.startsWith("RATE:");
+  const safeCity = city.replace(/\\/g,"\\\\").replace(/'/g,"\\'");
+
+  let icon, title, body, action;
+
+  if (isNoKey) {
+    icon  = "🔑";
+    title = "API Key Required";
+    body  = errMsg.replace("NO_KEY: ","") + "<br><br>1. Go to <strong>openrouter.ai/keys</strong><br>2. Sign up free &amp; create a key<br>3. Paste it into <code>js/config.js</code>";
+    action = `<a href="https://openrouter.ai/keys" target="_blank" class="retry-gen-btn" style="text-decoration:none;display:inline-block;margin-top:4px;">Get a free key →</a>`;
+  } else if (isRate) {
+    icon  = "⏳";
+    title = "Too many requests";
+    body  = "Please wait 30 seconds and try again.";
+    action = `<button onclick="generateItinerary('${safeCity}')" class="retry-gen-btn" style="margin-top:8px;">↺ Retry</button>`;
+  } else {
+    icon  = "⚠️";
+    title = "Failed to generate itinerary";
+    body  = "Something went wrong. Please try again.";
+    action = `<button onclick="generateItinerary('${safeCity}')" class="retry-gen-btn" style="margin-top:8px;">↺ Retry</button>`;
+  }
+
+  wrap.innerHTML = `
+    <div class="single-loading-card">
+      <div style="font-size:2rem;margin-bottom:8px;">${icon}</div>
+      <p style="color:#EF4444;font-weight:700;font-size:1rem;margin:0 0 10px;">${title}</p>
+      <p style="font-size:0.85rem;color:#555;line-height:1.6;max-width:380px;margin:0 0 4px;">${body}</p>
+      ${action}
+    </div>
+  `;
+}
+
+// ══════════════════════════════════════════════
+// STEP 2 — EDITOR
+// ══════════════════════════════════════════════
+
+function showEditor() {
+  let section = document.getElementById("itineraryEditorSection");
+  if (!section) {
+    section = document.createElement("section");
+    section.id = "itineraryEditorSection";
+    section.className = "itin-editor-section";
+    document.querySelector(".search-container").insertAdjacentElement("afterend", section);
+  }
+  section.style.display = "block";
+  renderEditor();
+  section.scrollIntoView({ behavior:"smooth" });
+}
+
+function renderEditor() {
+  const section = document.getElementById("itineraryEditorSection");
+  const itin    = editingItinerary;
+  const sym     = currencySymbols[parsedCurrency] || parsedCurrency+" ";
+  const city    = parsedCity || localStorage.getItem("lastSearchedCity") || "Your Destination";
+
+  section.innerHTML = `
+    <div class="editor-header">
+      <button class="back-to-options-btn" onclick="backToSearch()">← New Search</button>
+      <div class="editor-title-wrap">
+        <span class="editor-emoji">${itin.emoji||"✈️"}</span>
+        <div>
+          <h2 class="editor-title">${itin.title}</h2>
+          <p class="editor-sub">${city} · ${parsedDays} day${parsedDays>1?"s":""} · ${sym}${parsedBudget.toLocaleString()}</p>
+        </div>
+      </div>
+      <button class="finalize-btn" onclick="finalizeItinerary()">✓ Save &amp; View Full Plan</button>
+    </div>
+
+    <div class="editor-body">
+      <div class="editor-days" id="editorDays"></div>
+      <div class="editor-sidebar">
+        <div class="editor-sidebar-card">
+          <h4>✨ Highlights</h4>
+          <ul class="highlight-list">${(itin.highlights||[]).map(h=>`<li>${h}</li>`).join("")}</ul>
+        </div>
+        <div class="editor-sidebar-card">
+          <h4>➕ Add Activity</h4>
+          <select id="addToDaySelect" class="editor-input">
+            ${(itin.days||[]).map((d,i)=>`<option value="${i}">Day ${d.day}: ${d.theme||""}</option>`).join("")}
+          </select>
+          <input id="newActivityTime" class="editor-input" type="text" placeholder="Time (e.g. 2:00 PM)">
+          <input id="newActivityName" class="editor-input" type="text" placeholder="Activity name">
+          <input id="newActivityDesc" class="editor-input" type="text" placeholder="Short description">
+          <input id="newActivityCost" class="editor-input" type="text" placeholder="Cost (e.g. ${sym}20)">
+          <button class="add-activity-btn" onclick="addCustomActivity()">Add to Itinerary</button>
+        </div>
+        <div class="editor-sidebar-card chat-card">
+          <h4>💬 Chat with AI</h4>
+          <p class="chat-hint">Ask me to modify this itinerary — swap activities, adjust budget, add a rest day…</p>
+          <div class="chat-messages" id="editorChatMessages"></div>
+          <div class="chat-input-row">
+            <textarea id="editorChatInput" placeholder="e.g. Replace Day 2 lunch with a vegan option…" rows="2"></textarea>
+            <button onclick="sendChatEdit()" class="chat-send-btn">↑</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+  renderDays();
+  chatHistory.forEach(m => appendChatMessage(m.role, m.text, false, true));
+  setTimeout(() => {
+    const chatInput = document.getElementById("editorChatInput");
+    if (chatInput) {
+      chatInput.addEventListener("keydown", e => {
+        if (e.key==="Enter" && !e.shiftKey) { e.preventDefault(); sendChatEdit(); }
+      });
+    }
+  }, 100);
+}
+
+function renderDays() {
+  const container = document.getElementById("editorDays");
+  if (!container) return;
+  container.innerHTML = "";
+  const typeColors = { attraction:"#3B82F6", food:"#F59E0B", transport:"#10B981", hotel:"#8B5CF6" };
+
+  (editingItinerary.days||[]).forEach((day, dayIdx) => {
+    const activitiesHTML = (day.activities||[]).map((act, actIdx) => `
+      <div class="editor-activity">
+        <span class="act-type-dot" style="background:${typeColors[act.type]||'#94A3B8'}"></span>
+        <div class="act-info">
+          <span class="act-time">${act.time||""}</span>
+          <span class="act-name">${act.name}</span>
+          ${act.desc ? `<span class="act-desc">${act.desc}</span>` : ""}
+        </div>
+        <span class="act-cost">${act.cost||""}</span>
+        <button class="act-remove-btn" onclick="removeActivity(${dayIdx},${actIdx})" title="Remove">✕</button>
+      </div>
+    `).join("");
+
+    const dayCard = document.createElement("div");
+    dayCard.className = "editor-day-card";
+    dayCard.innerHTML = `
+      <div class="editor-day-header">
+        <div class="editor-day-badge">Day ${day.day}</div>
+        <div class="editor-day-theme">${day.theme||""}</div>
+        <span class="editor-day-count">${(day.activities||[]).length} activities</span>
+      </div>
+      <div class="editor-activities-list">${activitiesHTML||'<p class="no-acts">No activities yet.</p>'}</div>
+    `;
+    container.appendChild(dayCard);
+  });
+}
+
+window.removeActivity = function(dayIdx, actIdx) {
+  editingItinerary.days[dayIdx].activities.splice(actIdx, 1);
+  renderDays();
+  showEditorToast("Activity removed");
+};
+
+window.addCustomActivity = function() {
+  const dayIdx = parseInt(document.getElementById("addToDaySelect").value);
+  const time   = document.getElementById("newActivityTime").value.trim();
+  const name   = document.getElementById("newActivityName").value.trim();
+  const desc   = document.getElementById("newActivityDesc").value.trim();
+  const cost   = document.getElementById("newActivityCost").value.trim();
+  if (!name) { showEditorToast("Please enter an activity name", "error"); return; }
+  editingItinerary.days[dayIdx].activities.push({ time:time||"", name, desc, cost, type:"attraction" });
+  renderDays();
+  ["newActivityTime","newActivityName","newActivityDesc","newActivityCost"].forEach(id => {
+    document.getElementById(id).value = "";
+  });
+  showEditorToast("Activity added ✓");
+};
+
+window.backToSearch = function() {
+  document.getElementById("itineraryEditorSection").style.display = "none";
+  window.scrollTo({ top:0, behavior:"smooth" });
+};
+
+// ─── AI Chat Edit ───
+window.sendChatEdit = async function() {
+  if (isGenerating) return;
+
+  const input   = document.getElementById("editorChatInput");
+  const msgText = input.value.trim();
+  if (!msgText) return;
+
+  isGenerating = true;
+  input.value = "";
+  appendChatMessage("user", msgText);
+  appendChatMessage("ai", "✦ Updating your itinerary…", true);
+
+  try {
+    const raw = await callAI(
+      "You are a travel assistant that edits itineraries. Return ONLY raw JSON — no markdown, no backticks, no explanation.",
+      `Current itinerary:\n${JSON.stringify(editingItinerary, null, 2)}\n\nUser request: "${msgText}"\n\nReturn ONLY the updated itinerary as raw JSON, same structure.`,
+      4096
+    );
+    editingItinerary = parseJSON(raw);
+    const savedHistory = [...chatHistory];
+    renderEditor();
+    chatHistory = savedHistory;
+    savedHistory.forEach(m => appendChatMessage(m.role, m.text, false, true));
+    appendChatMessage("ai", "✓ Done! Your itinerary has been updated.");
+  } catch(err) {
+    console.error("Chat edit error:", err);
+    appendChatMessage("ai", `Sorry — ${err.message.replace(/^(NO_KEY|RATE): /,"")}`);
+  } finally {
+    isGenerating = false;
+  }
+};
+
+function appendChatMessage(role, text, isTyping=false, noHistory=false) {
+  const box = document.getElementById("editorChatMessages");
+  if (!box) return;
+  const existing = box.querySelector(".typing-indicator");
+  if (existing) existing.remove();
+  const msg = document.createElement("div");
+  msg.className = `chat-msg chat-msg-${role}${isTyping?" typing-indicator":""}`;
+  msg.textContent = text;
+  box.appendChild(msg);
+  box.scrollTop = box.scrollHeight;
+  if (!isTyping && !noHistory) chatHistory.push({ role, text });
+}
+
+function showEditorToast(msg, type="success") {
+  let t = document.getElementById("editorToast");
+  if (!t) {
+    t = document.createElement("div");
+    t.id = "editorToast";
+    t.className = "editor-toast";
+    document.body.appendChild(t);
+  }
+  t.textContent = msg;
+  t.className = `editor-toast show ${type}`;
+  clearTimeout(t._timer);
+  t._timer = setTimeout(() => t.className = "editor-toast", 2500);
+}
+
+// ══════════════════════════════════════════════
+// STEP 3 — FINALIZE → PLAN PAGE
+// ══════════════════════════════════════════════
+
+window.finalizeItinerary = function() {
+  if (!editingItinerary) return;
+  const city = parsedCity || localStorage.getItem("lastSearchedCity") || "Your Destination";
+
+  const tripDays = editingItinerary.days.map(d => ({
+    label:    `Day ${d.day}: ${d.theme||""}`,
+    subLabel: `Day ${d.day}`,
+    activities: (d.activities||[]).map(a => ({
+      time: a.time || "–",
+      text: a.name + (a.desc ? ` — ${a.desc}` : ""),
+      cost: a.cost ? parseFloat(a.cost.replace(/[^0-9.]/g,""))||0 : 0
+    }))
+  }));
+
+  localStorage.setItem("tripDays", JSON.stringify(tripDays));
+  localStorage.setItem("selectedDays", parsedDays);
+  localStorage.setItem("tripBudget", parsedBudget);
+  localStorage.setItem("lastSearchedCity", city);
+  localStorage.setItem("tripCurrency", parsedCurrency);
+  localStorage.setItem("finalItinerary", JSON.stringify(editingItinerary));
+  localStorage.setItem("tripItineraryTitle", editingItinerary.title||"My Itinerary");
+  localStorage.setItem("tripDatesLabel", parsedDatesLabel);
+
+  window.location.href = "plan.html";
+};
+
+// ─── Boot ───
 renderHistory();
