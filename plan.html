@@ -10,8 +10,9 @@
   <link rel="stylesheet" href="css/plan.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.min.css"/>
   <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.min.js"></script>
-  <script src="js/config.js"></script>
-  <script src="js/plan.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+  <script src="js/config.js" defer></script>
+  <script src="js/plan.js" defer></script>
 </head>
 <body>
 
@@ -26,25 +27,29 @@
 
 <div class="container">
   <div class="itinerary-section">
-    <div class="section-header">
-      <h2>Your Itinerary</h2>
-      <button id="clearAllBtn" class="clear-btn">Clear All</button>
-    </div>
-
-    <div id="daysContainer"></div>
-    <button id="addDayBtn" class="add-day-btn">+ Add Day</button>
-
-    <div class="map-section" style="margin-top:24px; border-radius:16px; overflow:hidden; border:1px solid #EDE3CC;">
-      <div style="display:flex; align-items:center; justify-content:space-between; padding:16px 20px; background:white; border-bottom:1px solid #EDE3CC;">
-        <h3 style="margin:0; font-size:0.95rem; font-weight:700; font-family:'Playfair Display',serif;">🗺️ Trip Map <span id="mapPinCount" style="font-size:0.72rem; color:#94a3b8; font-weight:400;"></span></h3>
-        <button id="mapToggleBtn" style="padding:7px 18px; background:#C4623A; color:white; border:none; border-radius:20px; font-size:0.82rem; font-weight:500; cursor:pointer; font-family:'DM Sans',sans-serif;">Show Map</button>
+    <div id="exportArea">
+      <div class="section-header">
+        <h2>Your Itinerary</h2>
+        <button id="clearAllBtn" class="clear-btn">Clear All</button>
+        <button id="downloadPdfBtn" class="export-btn">Download PDF</button>
+        <button id="downloadWordBtn" class="export-btn">Download Word</button>
       </div>
-      <div id="mapBody" style="display:none;">
-        <div id="tripMap" style="height:420px; width:100%;"></div>
-        <div style="display:flex; gap:16px; padding:10px 20px; background:white; border-top:1px solid #EDE3CC; font-size:0.78rem; color:#64748b; flex-wrap:wrap;">
-          <div style="display:flex;align-items:center;gap:6px;"><div style="width:10px;height:10px;border-radius:50%;background:#C4623A;"></div> Hotel</div>
-          <div style="display:flex;align-items:center;gap:6px;"><div style="width:10px;height:10px;border-radius:50%;background:#D4924A;"></div> Attraction</div>
-          <div style="display:flex;align-items:center;gap:6px;"><div style="width:22px;border-top:2px dashed #EDE3CC;"></div> Distance line</div>
+
+      <div id="daysContainer"></div>
+      <button id="addDayBtn" class="add-day-btn">+ Add Day</button>
+
+      <div class="map-section" style="margin-top:24px; border-radius:16px; overflow:hidden; border:1px solid #EDE3CC;">
+        <div style="display:flex; align-items:center; justify-content:space-between; padding:16px 20px; background:white; border-bottom:1px solid #EDE3CC;">
+          <h3 style="margin:0; font-size:0.95rem; font-weight:700; font-family:'Playfair Display',serif;">🗺️ Trip Map <span id="mapPinCount" style="font-size:0.72rem; color:#94a3b8; font-weight:400;"></span></h3>
+          <button id="mapToggleBtn" style="padding:7px 18px; background:#C4623A; color:white; border:none; border-radius:20px; font-size:0.82rem; font-weight:500; cursor:pointer; font-family:'DM Sans',sans-serif;">Show Map</button>
+        </div>
+        <div id="mapBody" style="display:none;">
+          <div id="tripMap" style="height:420px; width:100%;"></div>
+          <div style="display:flex; gap:16px; padding:10px 20px; background:white; border-top:1px solid #EDE3CC; font-size:0.78rem; color:#64748b; flex-wrap:wrap;">
+            <div style="display:flex;align-items:center;gap:6px;"><div style="width:10px;height:10px;border-radius:50%;background:#C4623A;"></div> Hotel</div>
+            <div style="display:flex;align-items:center;gap:6px;"><div style="width:10px;height:10px;border-radius:50%;background:#D4924A;"></div> Attraction</div>
+            <div style="display:flex;align-items:center;gap:6px;"><div style="width:22px;border-top:2px dashed #EDE3CC;"></div> Distance line</div>
+          </div>
         </div>
       </div>
     </div>

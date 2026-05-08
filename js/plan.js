@@ -1,8 +1,63 @@
 document.addEventListener("DOMContentLoaded", function() {
+  const pdfBtn = document.getElementById("downloadPdfBtn");
+  const wordBtn = document.getElementById("downloadWordBtn");
 
-  // ─────────────────────────────────────────
-  // STATE MANAGEMENT
-  // ─────────────────────────────────────────
+  if (pdfBtn) {
+    pdfBtn.addEventListener("click", async () => {
+      const exportArea = document.getElementById("exportArea");
+
+      if (!exportArea) {
+        alert("Export area not found.");
+        return;
+      }
+
+      if (typeof html2pdf === "undefined") {
+        alert("PDF library failed to load.");
+        return;
+      }
+
+      const opt = {
+        margin: 0.4,
+        filename: "trip-itinerary.pdf",
+        image: { type: "jpeg", quality: 0.98 },
+        html2canvas: { scale: 2, useCORS: true },
+        jsPDF: { unit: "in", format: "a4", orientation: "portrait" }
+      };
+
+      try {
+        await html2pdf().set(opt).from(exportArea).save();
+      } catch (err) {
+        console.error("PDF export failed:", err);
+        alert("PDF export failed. Check the console for details.");
+      }
+    });
+  }
+
+  if (wordBtn) {
+    wordBtn.addEventListener("click", () => {
+      const exportArea = document.getElementById("exportArea");
+
+      if (!exportArea) {
+        alert("Export area not found.");
+        return;
+      }
+
+      const header =
+        "<html xmlns:o='urn:schemas-microsoft-com:office:office' " +
+        "xmlns:w='urn:schemas-microsoft-com:office:word' " +
+        "xmlns='http://www.w3.org/TR/REC-html40'><head><meta charset='utf-8'><title>Trip Itinerary</title></head><body>";
+      const footer = "</body></html>";
+      const sourceHTML = header + exportArea.innerHTML + footer;
+      const source = "data:application/vnd.ms-word;charset=utf-8," + encodeURIComponent(sourceHTML);
+
+      const link = document.createElement("a");
+      link.href = source;
+      link.download = "trip-itinerary.doc";
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    });
+  }
 
   function getStartDate() {
     return localStorage.getItem("tripStartDate") || null;
@@ -41,7 +96,7 @@ document.addEventListener("DOMContentLoaded", function() {
       if (startDate) {
         const current = new Date(startDate);
         current.setDate(startDate.getDate() + i);
-        label = current.toLocaleDateString("en-US", { weekday: 'short', month: 'short', day: 'numeric' });
+        label = current.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
         subLabel = `Day ${i + 1}`;
       }
 
@@ -64,10 +119,6 @@ document.addEventListener("DOMContentLoaded", function() {
   function saveDays(days) {
     localStorage.setItem("tripDays", JSON.stringify(days));
   }
-
-  // ─────────────────────────────────────────
-  // TOAST & CUSTOM MODALS
-  // ─────────────────────────────────────────
 
   function showToast(message, type = "success") {
     const toast = document.getElementById("toast");
@@ -143,10 +194,6 @@ document.addEventListener("DOMContentLoaded", function() {
     _confirmCallback = null;
   }
 
-  // ─────────────────────────────────────────
-  // SIDEBAR COMPONENTS
-  // ─────────────────────────────────────────
-
   function renderDatePicker() {
     let container = document.getElementById("datePickerContainer");
     if (!container) {
@@ -154,7 +201,7 @@ document.addEventListener("DOMContentLoaded", function() {
       container.id = "datePickerContainer";
       container.style.cssText = `background: white; padding: 16px; border-radius: 12px; margin-bottom: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.05);`;
       const sidebar = document.querySelector(".sidebar");
-      sidebar.insertBefore(container, sidebar.firstChild);
+      if (sidebar) sidebar.insertBefore(container, sidebar.firstChild);
     }
     const savedDate = getStartDate() || "";
     container.innerHTML = `
@@ -180,8 +227,8 @@ document.addEventListener("DOMContentLoaded", function() {
       card.id = "budgetCard";
       card.style.cssText = `background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 12px; padding: 16px; margin-bottom: 16px; color: #166534;`;
       const hotelCard = document.getElementById("hotelCard");
-      if (hotelCard) sidebar.insertBefore(card, hotelCard.nextSibling);
-      else sidebar.appendChild(card);
+      if (hotelCard && sidebar) sidebar.insertBefore(card, hotelCard.nextSibling);
+      else if (sidebar) sidebar.appendChild(card);
     }
 
     const days = getDays();
@@ -210,19 +257,18 @@ document.addEventListener("DOMContentLoaded", function() {
       ${totalSpent > budget ? `<div style="font-size:0.75rem; color:#ef4444; font-weight:bold; margin-top:4px;">⚠️ Over Budget!</div>` : ""}
     `;
 
-    document.getElementById("editBudgetBtn").addEventListener("click", () => {
-      const newBudget = prompt("Enter your total trip budget ($):", budget);
-      if (newBudget !== null) {
-        const cleanBudget = parseFloat(newBudget.replace(/[^0-9.]/g, "")) || 0;
-        setBudget(cleanBudget);
-        renderBudgetTracker();
-      }
-    });
+    const editBtn = document.getElementById("editBudgetBtn");
+    if (editBtn) {
+      editBtn.addEventListener("click", () => {
+        const newBudget = prompt("Enter your total trip budget ($):", budget);
+        if (newBudget !== null) {
+          const cleanBudget = parseFloat(newBudget.replace(/[^0-9.]/g, "")) || 0;
+          setBudget(cleanBudget);
+          renderBudgetTracker();
+        }
+      });
+    }
   }
-
-  // ─────────────────────────────────────────
-  // HOTEL CARD — reads from "myTrip"
-  // ─────────────────────────────────────────
 
   function renderHotelCard() {
     const trip = JSON.parse(localStorage.getItem("myTrip")) || [];
@@ -236,8 +282,8 @@ document.addEventListener("DOMContentLoaded", function() {
       card.id = "hotelCard";
       card.style.cssText = `background: #C4623A; border-radius: 12px; padding: 16px 18px; margin-bottom: 16px; color: white;`;
       const datePicker = document.getElementById("datePickerContainer");
-      if (datePicker) sidebar.insertBefore(card, datePicker.nextSibling);
-      else sidebar.insertBefore(card, sidebar.firstChild);
+      if (datePicker && sidebar) sidebar.insertBefore(card, datePicker.nextSibling);
+      else if (sidebar) sidebar.insertBefore(card, sidebar.firstChild);
     }
 
     if (!hotel) {
@@ -268,13 +314,10 @@ document.addEventListener("DOMContentLoaded", function() {
     });
   };
 
-  // ─────────────────────────────────────────
-  // RENDER ITINERARY
-  // ─────────────────────────────────────────
-
   function render() {
     const days = getDays();
     const container = document.getElementById("daysContainer");
+    if (!container) return;
     container.innerHTML = "";
 
     renderDatePicker();
@@ -284,11 +327,14 @@ document.addEventListener("DOMContentLoaded", function() {
 
     if (days.length === 0) {
       container.innerHTML = `<div class="empty-state" style="padding:40px; text-align:center;"><div style="font-size:3rem; margin-bottom:10px; opacity:0.3;">🗓️</div><p>No days yet.</p><button id="startEmptyBtn" style="margin-top:10px; padding:8px 16px; background:#C4623A; color:white; border:none; border-radius:6px; cursor:pointer; font-weight:600;">+ Add Day 1</button></div>`;
-      document.getElementById("startEmptyBtn").addEventListener("click", () => {
-        days.push({ label: "Day 1", activities: [] });
-        saveDays(days);
-        render();
-      });
+      const startEmptyBtn = document.getElementById("startEmptyBtn");
+      if (startEmptyBtn) {
+        startEmptyBtn.addEventListener("click", () => {
+          days.push({ label: "Day 1", activities: [] });
+          saveDays(days);
+          render();
+        });
+      }
       return;
     }
 
@@ -374,10 +420,6 @@ document.addEventListener("DOMContentLoaded", function() {
     const badge = document.getElementById("mapPinCount");
     if (badge) badge.textContent = count > 0 ? `· ${count} spot${count > 1 ? "s" : ""}` : "";
   }
-
-  // ─────────────────────────────────────────
-  // MODAL (ADD ACTIVITY)
-  // ─────────────────────────────────────────
 
   let _activeDayIndex = null;
 
@@ -472,7 +514,7 @@ document.addEventListener("DOMContentLoaded", function() {
       const chip = document.createElement("div");
       chip.style.cssText = `display:inline-flex; align-items:center; background:#FFF5F0; border:1px solid #EDE3CC; border-radius:16px; padding:5px 12px; font-size:0.85rem; color:#C4623A; cursor:pointer; transition:all 0.2s;`;
       chip.onmouseover = () => chip.style.background = "#FDEEE8";
-      chip.onmouseout  = () => chip.style.background = "#FFF5F0";
+      chip.onmouseout = () => chip.style.background = "#FFF5F0";
 
       const text = document.createElement("span");
       text.textContent = spot.name;
@@ -540,10 +582,6 @@ document.addEventListener("DOMContentLoaded", function() {
     }
   });
 
-  // ─────────────────────────────────────────
-  // GLOBAL LISTENERS & INIT
-  // ─────────────────────────────────────────
-
   document.getElementById("addDayBtn").addEventListener("click", () => {
     const days = getDays();
     days.push({ label: `Day ${days.length + 1}`, activities: [] });
@@ -557,7 +595,6 @@ document.addEventListener("DOMContentLoaded", function() {
       localStorage.clear();
       render();
       showToast("All data cleared", "warning");
-      // Reset the map
       if (mapInstance) { mapInstance.remove(); mapInstance = null; }
       const mapDiv = document.getElementById("tripMap");
       if (mapDiv) mapDiv.innerHTML = `<div style="padding:40px;text-align:center;color:#94a3b8;">Add activities to see them on the map.</div>`;
@@ -571,10 +608,6 @@ document.addEventListener("DOMContentLoaded", function() {
       box.addEventListener("change", () => localStorage.setItem(key, box.checked));
     });
   }
-
-  // ─────────────────────────────────────────
-  // MAP
-  // ─────────────────────────────────────────
 
   const toggleBtn = document.getElementById("mapToggleBtn");
   if (toggleBtn) toggleBtn.remove();
@@ -591,22 +624,17 @@ document.addEventListener("DOMContentLoaded", function() {
 
   function autoInitMap() {
     const city = localStorage.getItem("lastSearchedCity") || "";
-    console.log("lastSearchedCity:", city);
     geocodeAndRender(city);
   }
 
   async function geocodeAndRender(city) {
-    console.log("Geocoding with city:", city);
-
     const days = getDays();
     const allActs = [];
 
-    // Add activities
     days.forEach(day => day.activities.forEach(act => {
       allActs.push({ text: act.text, time: act.time, isHotel: false });
     }));
 
-    // Add hotel from myTrip
     const trip = JSON.parse(localStorage.getItem("myTrip")) || [];
     const hotel = trip.find(s => s.name.startsWith("🏨"));
     if (hotel) {
@@ -618,6 +646,8 @@ document.addEventListener("DOMContentLoaded", function() {
     }
 
     const mapDiv = document.getElementById("tripMap");
+    if (!mapDiv) return;
+
     if (allActs.length === 0) {
       mapDiv.innerHTML = `<div style="padding:40px;text-align:center;color:#94a3b8;">Add activities to see them on the map.</div>`;
       return;
@@ -628,16 +658,12 @@ document.addEventListener("DOMContentLoaded", function() {
     const geocoded = [];
     for (const act of allActs) {
       const fullName = act.text.replace(/🏨\s?/, "").split(" (")[0].trim();
-      const cleanName = act.isHotel
-        ? fullName.split(" ").slice(0, 4).join(" ")
-        : fullName;
+      const cleanName = act.isHotel ? fullName.split(" ").slice(0, 4).join(" ") : fullName;
       try {
-        // Query with just "name city" — no bias coords which were causing wrong country matches
         const query = city ? `${cleanName} ${city}` : cleanName;
         const url = `https://photon.komoot.io/api/?q=${encodeURIComponent(query)}&limit=1`;
         const res = await fetch(url);
         const data = await res.json();
-        console.log("Geocode result for:", cleanName, data);
         if (data.features && data.features[0]) {
           const [lng, lat] = data.features[0].geometry.coordinates;
           geocoded.push({ name: cleanName, lat, lng, isHotel: act.isHotel, time: act.time });
@@ -648,8 +674,6 @@ document.addEventListener("DOMContentLoaded", function() {
       await new Promise(r => setTimeout(r, 200));
     }
 
-    console.log("All acts being geocoded:", allActs);
-    console.log("Final geocoded points:", geocoded);
     renderMap(geocoded);
   }
 
@@ -657,6 +681,7 @@ document.addEventListener("DOMContentLoaded", function() {
     if (mapInstance) { mapInstance.remove(); mapInstance = null; }
 
     const mapDiv = document.getElementById("tripMap");
+    if (!mapDiv) return;
     mapDiv.innerHTML = "";
 
     mapInstance = L.map("tripMap", { zoomControl: false });
@@ -668,11 +693,10 @@ document.addEventListener("DOMContentLoaded", function() {
 
     L.control.zoom({ position: "topright" }).addTo(mapInstance);
 
-    // Draw dashed lines between consecutive points
     if (points.length > 1) {
       for (let i = 0; i < points.length - 1; i++) {
         L.polyline(
-          [[points[i].lat, points[i].lng], [points[i+1].lat, points[i+1].lng]],
+          [[points[i].lat, points[i].lng], [points[i + 1].lat, points[i + 1].lng]],
           { color: "#EDE3CC", weight: 2, dashArray: "6, 6", opacity: 0.8 }
         ).addTo(mapInstance);
       }
@@ -710,10 +734,6 @@ document.addEventListener("DOMContentLoaded", function() {
     setTimeout(() => mapInstance.invalidateSize(), 300);
   }
 
-  // ─────────────────────────────────────────
-  // BOOT
-  // ─────────────────────────────────────────
-
   const savedDays = JSON.parse(localStorage.getItem("tripDays"));
   if (savedDays === null) {
     const savedSpots = JSON.parse(localStorage.getItem("myTrip")) || [];
@@ -725,5 +745,6 @@ document.addEventListener("DOMContentLoaded", function() {
       }
     }
   }
+
   render();
 });
