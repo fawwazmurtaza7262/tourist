@@ -1,9 +1,11 @@
 console.log("Destination JS loaded — OpenRouter");
 
+
 // ─── OpenRouter API ───
 const OPENROUTER_KEY = CONFIG.OPENROUTER_KEY;
 const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
 const AI_MODEL = "openai/gpt-4o-mini";
+
 
 // ─── Element refs ───
 const nlInput       = document.getElementById("nlInput");
@@ -14,13 +16,15 @@ const chipBudget    = document.getElementById("chipBudget");
 const chipCurrency  = document.getElementById("chipCurrency");
 const discoverBtn   = document.getElementById("discoverBtn");
 
+
 // ─── Currency config ───
 const currencySymbols = {
-  USD:"$", EUR:"€", GBP:"£", CAD:"CA$", AUD:"A$",
+  USD:"$", EUR:"€", GBP:"£", CAD:"CA$", AUD:"A$", 
   JPY:"¥", CHF:"CHF ", PKR:"₨", AED:"AED ", INR:"₹",
   MXN:"MX$", BRL:"R$", KRW:"₩", CNY:"¥", SGD:"S$",
   THB:"฿", TRY:"₺", ZAR:"R", SEK:"kr", NOK:"kr"
 };
+
 
 // ─── State ───
 let parsedCity       = "";
@@ -32,14 +36,17 @@ let editingItinerary = null;
 let chatHistory      = [];
 let isGenerating     = false;
 
+
 // ─── OpenRouter helper with auto-retry ───
 async function callAI(systemPrompt, userPrompt, maxTokens = 4096) {
   if (!OPENROUTER_KEY || OPENROUTER_KEY === "YOUR_OPENROUTER_KEY_HERE") {
     throw new Error("NO_KEY: Please add your OpenRouter API key to js/config.js");
   }
 
+
   const MAX_RETRIES = 3;
   let fallbackDelayMs = 5000;
+
 
   for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
     const res = await fetch(OPENROUTER_URL, {
@@ -60,6 +67,7 @@ async function callAI(systemPrompt, userPrompt, maxTokens = 4096) {
       })
     });
 
+
     let data = {};
     try {
       data = await res.json();
@@ -67,11 +75,14 @@ async function callAI(systemPrompt, userPrompt, maxTokens = 4096) {
       data = {};
     }
 
+
     const retryAfterRaw = res.headers.get("Retry-After");
     const retryAfterSec = retryAfterRaw ? Number(retryAfterRaw) : NaN;
 
+
     if (!res.ok || data.error) {
       const msg = data?.error?.message || `HTTP ${res.status}`;
+
 
       if (
         res.status === 401 ||
@@ -82,11 +93,13 @@ async function callAI(systemPrompt, userPrompt, maxTokens = 4096) {
         throw new Error("NO_KEY: Invalid API key. Check your key at openrouter.ai/keys");
       }
 
+
       if (res.status === 429 || data?.error?.code === 429) {
         if (attempt < MAX_RETRIES) {
           const waitMs = Number.isFinite(retryAfterSec) && retryAfterSec > 0
             ? retryAfterSec * 1000
             : fallbackDelayMs;
+
 
           updateLoadingLabel(`Rate limited — waiting ${Math.round(waitMs / 1000)}s, then retrying… (${attempt}/${MAX_RETRIES})`);
           await new Promise(r => setTimeout(r, waitMs));
@@ -96,8 +109,10 @@ async function callAI(systemPrompt, userPrompt, maxTokens = 4096) {
         throw new Error("RATE: Still rate limited after several retries. Please wait and try again.");
       }
 
+
       throw new Error(msg);
     }
+
 
     const text = data.choices?.[0]?.message?.content;
     if (!text) throw new Error("Empty response. Please try again.");
@@ -105,9 +120,29 @@ async function callAI(systemPrompt, userPrompt, maxTokens = 4096) {
   }
 }
 
+
 function parseJSON(raw) {
   return JSON.parse(raw.replace(/```json/gi,"").replace(/```/g,"").trim());
 }
+
+
+// ─── Currency mapping helper ───
+const currencyMap = [
+  { re: /\b(usd|us dollar|us dollars?|dollar|dollars?)\b/i,           code: "USD" },
+  { re: /\b(cad|canadian dollar|canadian dollars?)\b/i,               code: "CAD" },
+  { re: /\b(gbp|pound|pounds?|british pound|sterling)\b/i,            code: "GBP" },
+  { re: /\b(eur|euro|euros?)\b/i,                                     code: "EUR" },
+  { re: /\b(aud|australian dollar|australian dollars?)\b/i,          code: "AUD" },
+  { re: /\b(jpy|yen)\b/i,                                             code: "JPY" },
+  { re: /\b(inr|rupee|rupees)\b/i,                                    code: "INR" },
+  { re: /\b(pkr|pakistani rupee|pakistani rupees)\b/i,                code: "PKR" },
+  { re: /\b(aed|dirham|dirhams)\b/i,                                  code: "AED" },
+  { re: /\b(mxn|peso|pesos?)\b/i,                                     code: "MXN" },
+  { re: /\b(brl|real|reais)\b/i,                                      code: "BRL" },
+  { re: /\b(chf|franc|francs)\b/i,                                    code: "CHF" },
+  { re: /\b(sgd|singapore dollar|singapore dollars?)\b/i,            code: "SGD" }
+];
+
 
 // ─── NL Parsing (regex — no AI calls wasted) ───
 let parseDebounce = null;
@@ -119,9 +154,12 @@ nlInput.addEventListener("input", () => {
   parseDebounce = setTimeout(() => parseInput(val), 400);
 });
 
+
 function parseInput(text) {
   const lower = text.toLowerCase();
 
+
+  // ─── CITY ───
   const cityMatch = text.match(
     /(?:go(?:ing)?\s+to|trip\s+to|visit(?:ing)?|travel(?:ling)?\s+to|in|fly(?:ing)?\s+to|heading\s+to)\s+([A-Z][a-zA-Z\s\-]{1,30}?)(?=\s+(?:for|from|with|on|\d)|[,.]|$)/i
   );
@@ -131,42 +169,83 @@ function parseInput(text) {
     if (cap) parsedCity = cap[1];
   }
 
-  const daysMatch = lower.match(/(\d+)\s*day/);
-  const weekMatch = lower.match(/(\d+)\s*week/);
-  const aWeek     = lower.includes("a week") || lower.includes("one week");
+
+  // ─── DAYS ───
+  const daysMatch   = lower.match(/(\d+)\s*day/);
+  const weekMatch   = lower.match(/(\d+)\s*week/);
+  const aWeek       = lower.includes("a week") || lower.includes("one week");
   parsedDays = daysMatch ? parseInt(daysMatch[1])
              : weekMatch ? parseInt(weekMatch[1]) * 7
              : aWeek     ? 7 : 3;
   parsedDays = Math.max(1, Math.min(parsedDays, 30));
 
-  const budgetMatch = text.match(/[£$€₨₹¥]?\s*(\d[\d,]*(?:\.\d+)?)\s*(k)?\b/i);
+
+  // ─── CURRENCY (words, codes, symbols) ───
+  parsedCurrency = "USD";
+  for (const c of currencyMap) {
+    if (c.re.test(text)) {
+      parsedCurrency = c.code;
+      break;
+    }
+  }
+
+  // Fallback using symbols if no words/codes matched
+  if (!text.match(/\b(usd|cad|gbp|eur|aud|jpy|inr|pkr|aed|mxn|brl|chf|sgd|dollar|dollars?|pound|pounds?|euro|euros?|yen|rupee|rupees|dirham|dirhams|peso|pesos?|franc|francs|real|reais)\b/i) && /[£$€₨₹¥]/.test(text)) {
+    if      (text.includes("£")) parsedCurrency = "GBP";
+    else if (text.includes("€")) parsedCurrency = "EUR";
+    else if (text.includes("₨")) parsedCurrency = "PKR";
+    else if (text.includes("₹")) parsedCurrency = "INR";
+    else if (text.includes("¥")) parsedCurrency = "JPY";
+    else                        parsedCurrency = "USD";
+  }
+
+
+  // ─── BUDGET (no longer grabs “1 day”) ───
+  const budgetPatterns = [
+    // budget phrase, then optional currency word, then number
+    /(?:budget|spend|cost|under|around|about|on)\s*(?:of\s*)?(?:[£$€₨₹¥]|\b(?:CAD|USD|GBP|EUR|AUD|JPY|PKR)\b)?\s*(\d[\d,]*(?:\.\d+)?)(k)?/i,
+  
+    // number immediately after budget phrase
+    /\b(?:budget|spend|cost|under|around|about|on)\s*(?:of\s*)?(\d[\d,]*(?:\.\d+)?)(k)?\b/i,
+  
+    // number then budget word
+    /\b(\d[\d,]*(?:\.\d+)?)(k)?\s*(?:budget|spend|cost|under|around|about)\b/i,
+  
+    // symbol‑only match (fallback)
+    /[£$€₨₹¥]\s*(\d[\d,]*(?:\.\d+)?)(k)?/i
+  ];
+  
+  let budgetMatch = null;
+  for (const re of budgetPatterns) {
+    const m = text.match(re);
+    if (m) {
+      budgetMatch = m;
+      break;
+    }
+  }
+  
   if (budgetMatch) {
-    let val = parseFloat(budgetMatch[1].replace(/,/g,""));
+    let val = parseFloat(budgetMatch[1].replace(/,/g, ""));
     if (budgetMatch[2]) val *= 1000;
     parsedBudget = val > 0 ? val : 5000;
   } else {
     parsedBudget = 5000;
   }
 
-  if      (text.includes("£") || lower.includes("pound"))   parsedCurrency = "GBP";
-  else if (text.includes("€") || lower.includes("euro"))    parsedCurrency = "EUR";
-  else if (text.includes("₨") || lower.includes("pkr") || lower.includes("rupee")) parsedCurrency = "PKR";
-  else if (text.includes("₹") || lower.includes("inr"))     parsedCurrency = "INR";
-  else if (text.includes("¥") || lower.includes("yen"))     parsedCurrency = "JPY";
-  else if (lower.includes("cad") || lower.includes("canadian")) parsedCurrency = "CAD";
-  else if (lower.includes("aud") || lower.includes("australian")) parsedCurrency = "AUD";
-  else                                                        parsedCurrency = "USD";
 
+  // ─── DATES ───
   const dateMatch = text.match(/(?:from\s+)?([A-Z][a-z]+\s+\d{1,2})(?:\s*[-–to]+\s*(?:[A-Z][a-z]+\s*)?\d{1,2})?/);
   parsedDatesLabel = dateMatch ? dateMatch[0].replace(/^from\s+/i,"").trim() : "";
+
 
   if (parsedCity) showParsedSummary();
   else parsedSummary.style.display = "none";
 }
 
+
 function showParsedSummary() {
   if (!parsedCity && !parsedDays) return;
-  const sym = currencySymbols[parsedCurrency] || parsedCurrency+" ";
+  const sym = currencySymbols[parsedCurrency] || parsedCurrency + " ";
   chipCity.innerHTML     = parsedCity ? `📍 <strong>${parsedCity}</strong>` : "";
   chipDates.innerHTML    = parsedDatesLabel
     ? `📅 <strong>${parsedDatesLabel}</strong> · ${parsedDays} day${parsedDays>1?"s":""}`
@@ -179,6 +258,7 @@ function showParsedSummary() {
   chipCurrency.style.display = "";
   parsedSummary.style.display = "flex";
 }
+
 
 // ─── Search History ───
 function getHistory(){ return JSON.parse(localStorage.getItem("searchHistory"))||[]; }
@@ -207,20 +287,25 @@ window.clearHistory = function(){
   renderHistory();
 };
 
+
 // ─── Discover Button ───
 discoverBtn.addEventListener("click", () => {
   if (isGenerating) return;
 
+
   const rawInput = nlInput.value.trim();
   if (!rawInput){ alert("Tell us where you want to go!"); return; }
+
 
   if (!parsedCity) parseInput(rawInput);
   const rawCity = parsedCity || rawInput;
   if (!rawCity) { alert("Please enter a destination."); return; }
 
+
   isGenerating = true;
   discoverBtn.disabled = true;
   discoverBtn.textContent = "Generating…";
+
 
   localStorage.setItem("selectedDays", parsedDays);
   localStorage.setItem("tripBudget", parsedBudget);
@@ -229,12 +314,15 @@ discoverBtn.addEventListener("click", () => {
   localStorage.setItem("tripDatesLabel", parsedDatesLabel);
   saveToHistory(rawCity);
 
+
   showLoadingSection(rawCity);
 });
+
 
 // ══════════════════════════════════════════════
 // STEP 1 — GENERATE ITINERARY
 // ══════════════════════════════════════════════
+
 
 function showLoadingSection(city) {
   let section = document.getElementById("itineraryGenSection");
@@ -263,12 +351,14 @@ function showLoadingSection(city) {
   generateItinerary(city);
 }
 
+
 async function generateItinerary(city) {
   const sym = currencySymbols[parsedCurrency] || parsedCurrency+" ";
   try {
     const raw = await callAI(
       "You are an expert travel planner. Always respond with ONLY a raw JSON object — no markdown, no backticks, no explanation.",
       `Create a ${parsedDays}-day itinerary for ${city} with a budget of ${sym}${parsedBudget} ${parsedCurrency}.
+
 
 Return ONLY this JSON structure:
 {
@@ -291,6 +381,7 @@ Generate exactly ${parsedDays} days, 4-5 activities each. Types: attraction, foo
       4096
     );
 
+
     const itin = parseJSON(raw);
     document.getElementById("itineraryGenSection").style.display = "none";
     editingItinerary = itin;
@@ -306,26 +397,31 @@ Generate exactly ${parsedDays} days, 4-5 activities each. Types: attraction, foo
   }
 }
 
+
 function updateLoadingLabel(text) {
   const label = document.querySelector(".loading-label");
   if (label) label.textContent = text;
 }
 
+
 function showGenerationError(city, errMsg = "") {
   const wrap = document.querySelector(".single-loading-wrap");
   if (!wrap) return;
+
 
   const isNoKey  = errMsg.startsWith("NO_KEY:");
   const isRate   = errMsg.startsWith("RATE:");
   const safeCity = city.replace(/\\/g,"\\\\").replace(/'/g,"\\'");
 
+
   let icon, title, body, action;
+
 
   if (isNoKey) {
     icon  = "🔑";
     title = "API Key Required";
-    body  = errMsg.replace("NO_KEY: ","") + "<br><br>1. Go to <strong>openrouter.ai/keys</strong><br>2. Sign up free &amp; create a key<br>3. Paste it into <code>js/config.js</code>";
-    action = `<a href="https://openrouter.ai/keys" target="_blank" class="retry-gen-btn" style="text-decoration:none;display:inline-block;margin-top:4px;">Get a free key →</a>`;
+    body  = errMsg.replace("NO_KEY: ","") + "<br><br>1. Go to <strong>openrouter.ai/keys</strong><br>2. Sign up free &amp; create a key<br>3. Paste it in <strong>js/config.js</strong> and refresh this page.";
+    
   } else if (isRate) {
     icon  = "⏳";
     title = "Too many requests";
@@ -338,6 +434,7 @@ function showGenerationError(city, errMsg = "") {
     action = `<button onclick="generateItinerary('${safeCity}')" class="retry-gen-btn" style="margin-top:8px;">↺ Retry</button>`;
   }
 
+
   wrap.innerHTML = `
     <div class="single-loading-card">
       <div style="font-size:2rem;margin-bottom:8px;">${icon}</div>
@@ -348,9 +445,11 @@ function showGenerationError(city, errMsg = "") {
   `;
 }
 
+
 // ══════════════════════════════════════════════
 // STEP 2 — EDITOR
 // ══════════════════════════════════════════════
+
 
 function showEditor() {
   let section = document.getElementById("itineraryEditorSection");
@@ -365,11 +464,13 @@ function showEditor() {
   section.scrollIntoView({ behavior:"smooth" });
 }
 
+
 function renderEditor() {
   const section = document.getElementById("itineraryEditorSection");
   const itin    = editingItinerary;
-  const sym     = currencySymbols[parsedCurrency] || parsedCurrency+" ";
+  const sym     = currencySymbols[parsedCurrency] || parsedCurrency + " ";
   const city    = parsedCity || localStorage.getItem("lastSearchedCity") || "Your Destination";
+
 
   section.innerHTML = `
     <div class="editor-header">
@@ -383,6 +484,7 @@ function renderEditor() {
       </div>
       <button class="finalize-btn" onclick="finalizeItinerary()">✓ Save &amp; View Full Plan</button>
     </div>
+
 
     <div class="editor-body">
       <div class="editor-days" id="editorDays"></div>
@@ -426,11 +528,13 @@ function renderEditor() {
   }, 100);
 }
 
+
 function renderDays() {
   const container = document.getElementById("editorDays");
   if (!container) return;
   container.innerHTML = "";
   const typeColors = { attraction:"#3B82F6", food:"#F59E0B", transport:"#10B981", hotel:"#8B5CF6" };
+
 
   (editingItinerary.days||[]).forEach((day, dayIdx) => {
     const activitiesHTML = (day.activities||[]).map((act, actIdx) => `
@@ -446,6 +550,7 @@ function renderDays() {
       </div>
     `).join("");
 
+
     const dayCard = document.createElement("div");
     dayCard.className = "editor-day-card";
     dayCard.innerHTML = `
@@ -460,11 +565,13 @@ function renderDays() {
   });
 }
 
+
 window.removeActivity = function(dayIdx, actIdx) {
   editingItinerary.days[dayIdx].activities.splice(actIdx, 1);
   renderDays();
   showEditorToast("Activity removed");
 };
+
 
 window.addCustomActivity = function() {
   const dayIdx = parseInt(document.getElementById("addToDaySelect").value);
@@ -481,23 +588,28 @@ window.addCustomActivity = function() {
   showEditorToast("Activity added ✓");
 };
 
+
 window.backToSearch = function() {
   document.getElementById("itineraryEditorSection").style.display = "none";
   window.scrollTo({ top:0, behavior:"smooth" });
 };
 
+
 // ─── AI Chat Edit ───
 window.sendChatEdit = async function() {
   if (isGenerating) return;
+
 
   const input   = document.getElementById("editorChatInput");
   const msgText = input.value.trim();
   if (!msgText) return;
 
+
   isGenerating = true;
   input.value = "";
   appendChatMessage("user", msgText);
   appendChatMessage("ai", "✦ Updating your itinerary…", true);
+
 
   try {
     const raw = await callAI(
@@ -519,6 +631,7 @@ window.sendChatEdit = async function() {
   }
 };
 
+
 function appendChatMessage(role, text, isTyping=false, noHistory=false) {
   const box = document.getElementById("editorChatMessages");
   if (!box) return;
@@ -531,6 +644,7 @@ function appendChatMessage(role, text, isTyping=false, noHistory=false) {
   box.scrollTop = box.scrollHeight;
   if (!isTyping && !noHistory) chatHistory.push({ role, text });
 }
+
 
 function showEditorToast(msg, type="success") {
   let t = document.getElementById("editorToast");
@@ -546,13 +660,16 @@ function showEditorToast(msg, type="success") {
   t._timer = setTimeout(() => t.className = "editor-toast", 2500);
 }
 
+
 // ══════════════════════════════════════════════
 // STEP 3 — FINALIZE → PLAN PAGE
 // ══════════════════════════════════════════════
 
+
 window.finalizeItinerary = function() {
   if (!editingItinerary) return;
   const city = parsedCity || localStorage.getItem("lastSearchedCity") || "Your Destination";
+
 
   const tripDays = editingItinerary.days.map(d => ({
     label:    `Day ${d.day}: ${d.theme||""}`,
@@ -564,6 +681,7 @@ window.finalizeItinerary = function() {
     }))
   }));
 
+
   localStorage.setItem("tripDays", JSON.stringify(tripDays));
   localStorage.setItem("selectedDays", parsedDays);
   localStorage.setItem("tripBudget", parsedBudget);
@@ -573,8 +691,10 @@ window.finalizeItinerary = function() {
   localStorage.setItem("tripItineraryTitle", editingItinerary.title||"My Itinerary");
   localStorage.setItem("tripDatesLabel", parsedDatesLabel);
 
+
   window.location.href = "plan.html";
 };
+
 
 // ─── Boot ───
 renderHistory();
