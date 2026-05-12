@@ -19,7 +19,7 @@ const discoverBtn   = document.getElementById("discoverBtn");
 
 // ─── Currency config ───
 const currencySymbols = {
-  USD:"$", EUR:"€", GBP:"£", CAD:"CA$", AUD:"A$", 
+  USD:"$", EUR:"€", GBP:"£", CAD:"CA$", AUD:"A$",
   JPY:"¥", CHF:"CHF ", PKR:"₨", AED:"AED ", INR:"₹",
   MXN:"MX$", BRL:"R$", KRW:"₩", CNY:"¥", SGD:"S$",
   THB:"฿", TRY:"₺", ZAR:"R", SEK:"kr", NOK:"kr"
@@ -31,6 +31,7 @@ let parsedCity       = "";
 let parsedDays       = 3;
 let parsedBudget     = 5000;
 let parsedCurrency   = "USD";
+let parsedStartTime  = "9:00 AM";
 let parsedDatesLabel = "";
 let editingItinerary = null;
 let chatHistory      = [];
@@ -43,10 +44,8 @@ async function callAI(systemPrompt, userPrompt, maxTokens = 4096) {
     throw new Error("NO_KEY: Please add your OpenRouter API key to js/config.js");
   }
 
-
   const MAX_RETRIES = 3;
   let fallbackDelayMs = 5000;
-
 
   for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
     const res = await fetch(OPENROUTER_URL, {
@@ -62,11 +61,10 @@ async function callAI(systemPrompt, userPrompt, maxTokens = 4096) {
         max_tokens: maxTokens,
         messages: [
           { role: "system", content: systemPrompt },
-          { role: "user", content: userPrompt }
+          { role: "user",   content: userPrompt }
         ]
       })
     });
-
 
     let data = {};
     try {
@@ -75,14 +73,11 @@ async function callAI(systemPrompt, userPrompt, maxTokens = 4096) {
       data = {};
     }
 
-
     const retryAfterRaw = res.headers.get("Retry-After");
     const retryAfterSec = retryAfterRaw ? Number(retryAfterRaw) : NaN;
 
-
     if (!res.ok || data.error) {
       const msg = data?.error?.message || `HTTP ${res.status}`;
-
 
       if (
         res.status === 401 ||
@@ -93,13 +88,11 @@ async function callAI(systemPrompt, userPrompt, maxTokens = 4096) {
         throw new Error("NO_KEY: Invalid API key. Check your key at openrouter.ai/keys");
       }
 
-
       if (res.status === 429 || data?.error?.code === 429) {
         if (attempt < MAX_RETRIES) {
           const waitMs = Number.isFinite(retryAfterSec) && retryAfterSec > 0
             ? retryAfterSec * 1000
             : fallbackDelayMs;
-
 
           updateLoadingLabel(`Rate limited — waiting ${Math.round(waitMs / 1000)}s, then retrying… (${attempt}/${MAX_RETRIES})`);
           await new Promise(r => setTimeout(r, waitMs));
@@ -109,10 +102,8 @@ async function callAI(systemPrompt, userPrompt, maxTokens = 4096) {
         throw new Error("RATE: Still rate limited after several retries. Please wait and try again.");
       }
 
-
       throw new Error(msg);
     }
-
 
     const text = data.choices?.[0]?.message?.content;
     if (!text) throw new Error("Empty response. Please try again.");
@@ -132,7 +123,7 @@ const currencyMap = [
   { re: /\b(cad|canadian dollar|canadian dollars?)\b/i,               code: "CAD" },
   { re: /\b(gbp|pound|pounds?|british pound|sterling)\b/i,            code: "GBP" },
   { re: /\b(eur|euro|euros?)\b/i,                                     code: "EUR" },
-  { re: /\b(aud|australian dollar|australian dollars?)\b/i,          code: "AUD" },
+  { re: /\b(aud|australian dollar|australian dollars?)\b/i,           code: "AUD" },
   { re: /\b(jpy|yen)\b/i,                                             code: "JPY" },
   { re: /\b(inr|rupee|rupees)\b/i,                                    code: "INR" },
   { re: /\b(pkr|pakistani rupee|pakistani rupees)\b/i,                code: "PKR" },
@@ -140,7 +131,7 @@ const currencyMap = [
   { re: /\b(mxn|peso|pesos?)\b/i,                                     code: "MXN" },
   { re: /\b(brl|real|reais)\b/i,                                      code: "BRL" },
   { re: /\b(chf|franc|francs)\b/i,                                    code: "CHF" },
-  { re: /\b(sgd|singapore dollar|singapore dollars?)\b/i,            code: "SGD" }
+  { re: /\b(sgd|singapore dollar|singapore dollars?)\b/i,             code: "SGD" }
 ];
 
 
@@ -158,6 +149,25 @@ nlInput.addEventListener("input", () => {
 function parseInput(text) {
   const lower = text.toLowerCase();
 
+  // ─── START TIME — parsed FIRST before anything else touches the string ───
+  // Matches: "start at 1 pm", "starting at 9:30am", "begin at 10 AM", "kick off at 2pm"
+  const timeMatch = lower.match(
+    /(?:start(?:ing)?|begin(?:ning)?|kick\s*off)\s+(?:at\s+)?(\d{1,2})(?::(\d{2}))?\s*(am|pm)/
+  );
+
+  if (timeMatch) {
+    let hour     = parseInt(timeMatch[1], 10);
+    const mins   = timeMatch[2] || "00";
+    const period = timeMatch[3].toUpperCase();
+
+    if (hour === 12 && period === "AM") hour = 0;
+    if (hour !== 12 && period === "PM") hour += 12;
+
+    const displayHour = hour === 0 ? 12 : hour > 12 ? hour - 12 : hour;
+    parsedStartTime = `${displayHour}:${mins} ${period}`;
+  } else {
+    parsedStartTime = "9:00 AM";
+  }
 
   // ─── CITY ───
   const cityMatch = text.match(
@@ -169,16 +179,14 @@ function parseInput(text) {
     if (cap) parsedCity = cap[1];
   }
 
-
   // ─── DAYS ───
-  const daysMatch   = lower.match(/(\d+)\s*day/);
-  const weekMatch   = lower.match(/(\d+)\s*week/);
-  const aWeek       = lower.includes("a week") || lower.includes("one week");
+  const daysMatch = lower.match(/(\d+)\s*day/);
+  const weekMatch = lower.match(/(\d+)\s*week/);
+  const aWeek     = lower.includes("a week") || lower.includes("one week");
   parsedDays = daysMatch ? parseInt(daysMatch[1])
              : weekMatch ? parseInt(weekMatch[1]) * 7
              : aWeek     ? 7 : 3;
   parsedDays = Math.max(1, Math.min(parsedDays, 30));
-
 
   // ─── CURRENCY (words, codes, symbols) ───
   parsedCurrency = "USD";
@@ -196,34 +204,23 @@ function parseInput(text) {
     else if (text.includes("₨")) parsedCurrency = "PKR";
     else if (text.includes("₹")) parsedCurrency = "INR";
     else if (text.includes("¥")) parsedCurrency = "JPY";
-    else                        parsedCurrency = "USD";
+    else                         parsedCurrency = "USD";
   }
 
-
-  // ─── BUDGET (no longer grabs “1 day”) ───
+  // ─── BUDGET (no longer grabs "1 day") ───
   const budgetPatterns = [
-    // budget phrase, then optional currency word, then number
-    /(?:budget|spend|cost|under|around|about|on)\s*(?:of\s*)?(?:[£$€₨₹¥]|\b(?:CAD|USD|GBP|EUR|AUD|JPY|PKR)\b)?\s*(\d[\d,]*(?:\.\d+)?)(k)?/i,
-  
-    // number immediately after budget phrase
+    /(?:budget|spend|cost|under|around|about|on)\s*(?:of\s*)?\b(?:[£$€₨₹¥]?|CAD|USD|GBP|EUR|AUD|JPY|PKR)\b\s*(\d[\d,]*(?:\.\d+)?)(k)?\s*(?:budget|spend|cost)?\b/i,
+    /\b(\d[\d,]*(?:\.\d+)?)(k)?\s*\b(?:[£$€₨₹¥]?|CAD|USD|GBP|EUR|AUD|JPY|PKR)\b\s*(?:budget|spend|cost|under|around|about)\b/i,
     /\b(?:budget|spend|cost|under|around|about|on)\s*(?:of\s*)?(\d[\d,]*(?:\.\d+)?)(k)?\b/i,
-  
-    // number then budget word
-    /\b(\d[\d,]*(?:\.\d+)?)(k)?\s*(?:budget|spend|cost|under|around|about)\b/i,
-  
-    // symbol‑only match (fallback)
     /[£$€₨₹¥]\s*(\d[\d,]*(?:\.\d+)?)(k)?/i
   ];
-  
+
   let budgetMatch = null;
   for (const re of budgetPatterns) {
     const m = text.match(re);
-    if (m) {
-      budgetMatch = m;
-      break;
-    }
+    if (m) { budgetMatch = m; break; }
   }
-  
+
   if (budgetMatch) {
     let val = parseFloat(budgetMatch[1].replace(/,/g, ""));
     if (budgetMatch[2]) val *= 1000;
@@ -232,11 +229,9 @@ function parseInput(text) {
     parsedBudget = 5000;
   }
 
-
   // ─── DATES ───
   const dateMatch = text.match(/(?:from\s+)?([A-Z][a-z]+\s+\d{1,2})(?:\s*[-–to]+\s*(?:[A-Z][a-z]+\s*)?\d{1,2})?/);
   parsedDatesLabel = dateMatch ? dateMatch[0].replace(/^from\s+/i,"").trim() : "";
-
 
   if (parsedCity) showParsedSummary();
   else parsedSummary.style.display = "none";
@@ -261,28 +256,28 @@ function showParsedSummary() {
 
 
 // ─── Search History ───
-function getHistory(){ return JSON.parse(localStorage.getItem("searchHistory"))||[]; }
-function saveToHistory(city){
-  let h = getHistory().filter(c=>c.toLowerCase()!==city.toLowerCase());
-  h.unshift(city); h=h.slice(0,6);
+function getHistory() { return JSON.parse(localStorage.getItem("searchHistory")) || []; }
+function saveToHistory(city) {
+  let h = getHistory().filter(c => c.toLowerCase() !== city.toLowerCase());
+  h.unshift(city); h = h.slice(0, 6);
   localStorage.setItem("searchHistory", JSON.stringify(h));
 }
-function renderHistory(){
+function renderHistory() {
   const container = document.getElementById("searchHistory");
   if (!container) return;
   const history = getHistory();
-  if (!history.length){ container.innerHTML=""; return; }
+  if (!history.length) { container.innerHTML = ""; return; }
   container.innerHTML = `<span class="history-label">Recent:</span>
-    ${history.map(city=>`<button onclick="fillCity('${city.replace(/'/g, "\\'")}')" class="history-chip">📍 ${city}</button>`).join("")}
+    ${history.map(city => `<button onclick="fillCity('${city.replace(/'/g, "\\'")}') " class="history-chip">📍 ${city}</button>`).join("")}
     <button onclick="clearHistory()" class="history-clear">✕ clear</button>`;
 }
-window.fillCity = function(city){
+window.fillCity = function(city) {
   nlInput.value = `I want to go to ${city}`;
   discoverBtn.classList.add("active");
   nlInput.focus();
   parseInput(nlInput.value.trim());
 };
-window.clearHistory = function(){
+window.clearHistory = function() {
   localStorage.removeItem("searchHistory");
   renderHistory();
 };
@@ -292,28 +287,23 @@ window.clearHistory = function(){
 discoverBtn.addEventListener("click", () => {
   if (isGenerating) return;
 
-
   const rawInput = nlInput.value.trim();
-  if (!rawInput){ alert("Tell us where you want to go!"); return; }
-
+  if (!rawInput) { alert("Tell us where you want to go!"); return; }
 
   if (!parsedCity) parseInput(rawInput);
   const rawCity = parsedCity || rawInput;
   if (!rawCity) { alert("Please enter a destination."); return; }
 
-
   isGenerating = true;
   discoverBtn.disabled = true;
   discoverBtn.textContent = "Generating…";
 
-
-  localStorage.setItem("selectedDays", parsedDays);
-  localStorage.setItem("tripBudget", parsedBudget);
+  localStorage.setItem("selectedDays",     parsedDays);
+  localStorage.setItem("tripBudget",       parsedBudget);
   localStorage.setItem("lastSearchedCity", rawCity);
-  localStorage.setItem("tripCurrency", parsedCurrency);
-  localStorage.setItem("tripDatesLabel", parsedDatesLabel);
+  localStorage.setItem("tripCurrency",     parsedCurrency);
+  localStorage.setItem("tripDatesLabel",   parsedDatesLabel);
   saveToHistory(rawCity);
-
 
   showLoadingSection(rawCity);
 });
@@ -323,7 +313,6 @@ discoverBtn.addEventListener("click", () => {
 // STEP 1 — GENERATE ITINERARY
 // ══════════════════════════════════════════════
 
-
 function showLoadingSection(city) {
   let section = document.getElementById("itineraryGenSection");
   if (!section) {
@@ -332,13 +321,13 @@ function showLoadingSection(city) {
     section.className = "itinerary-gen-section";
     document.querySelector(".search-container").insertAdjacentElement("afterend", section);
   }
-  const sym = currencySymbols[parsedCurrency] || parsedCurrency+" ";
+  const sym = currencySymbols[parsedCurrency] || parsedCurrency + " ";
   section.style.display = "block";
   section.innerHTML = `
     <div class="itin-gen-header">
       <div class="itin-gen-eyebrow">✨ AI Itinerary Planner</div>
       <h2 class="itin-gen-title">Building your itinerary for <em>${city}</em></h2>
-      <p class="itin-gen-sub">${parsedDays} day${parsedDays>1?"s":""} · ${sym}${parsedBudget.toLocaleString()} ${parsedCurrency}${parsedDatesLabel?" · "+parsedDatesLabel:""}</p>
+      <p class="itin-gen-sub">${parsedDays} day${parsedDays>1?"s":""} · ${sym}${parsedBudget.toLocaleString()} ${parsedCurrency}${parsedDatesLabel ? " · " + parsedDatesLabel : ""}</p>
     </div>
     <div class="single-loading-wrap">
       <div class="single-loading-card">
@@ -347,18 +336,17 @@ function showLoadingSection(city) {
       </div>
     </div>
   `;
-  section.scrollIntoView({ behavior:"smooth" });
+  section.scrollIntoView({ behavior: "smooth" });
   generateItinerary(city);
 }
 
 
 async function generateItinerary(city) {
-  const sym = currencySymbols[parsedCurrency] || parsedCurrency+" ";
+  const sym = currencySymbols[parsedCurrency] || parsedCurrency + " ";
   try {
     const raw = await callAI(
       "You are an expert travel planner. Always respond with ONLY a raw JSON object — no markdown, no backticks, no explanation.",
-      `Create a ${parsedDays}-day itinerary for ${city} with a budget of ${sym}${parsedBudget} ${parsedCurrency}.
-
+      `Create a ${parsedDays}-day itinerary for ${city} with a budget of ${sym}${parsedBudget} ${parsedCurrency}. Start the first day at ${parsedStartTime} and do not begin earlier than that time. Use 24‑hour style times in your JSON (e.g. "13:00").
 
 Return ONLY this JSON structure:
 {
@@ -381,8 +369,13 @@ Generate exactly ${parsedDays} days, 4-5 activities each. Types: attraction, foo
       4096
     );
 
-
     const itin = parseJSON(raw);
+
+    // Force the first activity of the trip to start at parsedStartTime
+    if (itin.days?.length && itin.days[0].activities?.length) {
+      itin.days[0].activities[0].time = parsedStartTime;
+    }
+
     document.getElementById("itineraryGenSection").style.display = "none";
     editingItinerary = itin;
     chatHistory = [];
@@ -408,32 +401,28 @@ function showGenerationError(city, errMsg = "") {
   const wrap = document.querySelector(".single-loading-wrap");
   if (!wrap) return;
 
-
   const isNoKey  = errMsg.startsWith("NO_KEY:");
   const isRate   = errMsg.startsWith("RATE:");
   const safeCity = city.replace(/\\/g,"\\\\").replace(/'/g,"\\'");
 
-
   let icon, title, body, action;
-
 
   if (isNoKey) {
     icon  = "🔑";
     title = "API Key Required";
     body  = errMsg.replace("NO_KEY: ","") + "<br><br>1. Go to <strong>openrouter.ai/keys</strong><br>2. Sign up free &amp; create a key<br>3. Paste it in <strong>js/config.js</strong> and refresh this page.";
-    
+    action = "";
   } else if (isRate) {
-    icon  = "⏳";
-    title = "Too many requests";
-    body  = "Please wait 30 seconds and try again.";
+    icon   = "⏳";
+    title  = "Too many requests";
+    body   = "Please wait 30 seconds and try again.";
     action = `<button onclick="generateItinerary('${safeCity}')" class="retry-gen-btn" style="margin-top:8px;">↺ Retry</button>`;
   } else {
-    icon  = "⚠️";
-    title = "Failed to generate itinerary";
-    body  = "Something went wrong. Please try again.";
+    icon   = "⚠️";
+    title  = "Failed to generate itinerary";
+    body   = "Something went wrong. Please try again.";
     action = `<button onclick="generateItinerary('${safeCity}')" class="retry-gen-btn" style="margin-top:8px;">↺ Retry</button>`;
   }
-
 
   wrap.innerHTML = `
     <div class="single-loading-card">
@@ -450,7 +439,6 @@ function showGenerationError(city, errMsg = "") {
 // STEP 2 — EDITOR
 // ══════════════════════════════════════════════
 
-
 function showEditor() {
   let section = document.getElementById("itineraryEditorSection");
   if (!section) {
@@ -461,7 +449,7 @@ function showEditor() {
   }
   section.style.display = "block";
   renderEditor();
-  section.scrollIntoView({ behavior:"smooth" });
+  section.scrollIntoView({ behavior: "smooth" });
 }
 
 
@@ -471,12 +459,11 @@ function renderEditor() {
   const sym     = currencySymbols[parsedCurrency] || parsedCurrency + " ";
   const city    = parsedCity || localStorage.getItem("lastSearchedCity") || "Your Destination";
 
-
   section.innerHTML = `
     <div class="editor-header">
       <button class="back-to-options-btn" onclick="backToSearch()">← New Search</button>
       <div class="editor-title-wrap">
-        <span class="editor-emoji">${itin.emoji||"✈️"}</span>
+        <span class="editor-emoji">${itin.emoji || "✈️"}</span>
         <div>
           <h2 class="editor-title">${itin.title}</h2>
           <p class="editor-sub">${city} · ${parsedDays} day${parsedDays>1?"s":""} · ${sym}${parsedBudget.toLocaleString()}</p>
@@ -484,7 +471,6 @@ function renderEditor() {
       </div>
       <button class="finalize-btn" onclick="finalizeItinerary()">✓ Save &amp; View Full Plan</button>
     </div>
-
 
     <div class="editor-body">
       <div class="editor-days" id="editorDays"></div>
@@ -522,7 +508,7 @@ function renderEditor() {
     const chatInput = document.getElementById("editorChatInput");
     if (chatInput) {
       chatInput.addEventListener("keydown", e => {
-        if (e.key==="Enter" && !e.shiftKey) { e.preventDefault(); sendChatEdit(); }
+        if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendChatEdit(); }
       });
     }
   }, 100);
@@ -535,31 +521,29 @@ function renderDays() {
   container.innerHTML = "";
   const typeColors = { attraction:"#3B82F6", food:"#F59E0B", transport:"#10B981", hotel:"#8B5CF6" };
 
-
-  (editingItinerary.days||[]).forEach((day, dayIdx) => {
-    const activitiesHTML = (day.activities||[]).map((act, actIdx) => `
+  (editingItinerary.days || []).forEach((day, dayIdx) => {
+    const activitiesHTML = (day.activities || []).map((act, actIdx) => `
       <div class="editor-activity">
-        <span class="act-type-dot" style="background:${typeColors[act.type]||'#94A3B8'}"></span>
+        <span class="act-type-dot" style="background:${typeColors[act.type] || '#94A3B8'}"></span>
         <div class="act-info">
-          <span class="act-time">${act.time||""}</span>
+          <span class="act-time">${act.time || ""}</span>
           <span class="act-name">${act.name}</span>
           ${act.desc ? `<span class="act-desc">${act.desc}</span>` : ""}
         </div>
-        <span class="act-cost">${act.cost||""}</span>
+        <span class="act-cost">${act.cost || ""}</span>
         <button class="act-remove-btn" onclick="removeActivity(${dayIdx},${actIdx})" title="Remove">✕</button>
       </div>
     `).join("");
-
 
     const dayCard = document.createElement("div");
     dayCard.className = "editor-day-card";
     dayCard.innerHTML = `
       <div class="editor-day-header">
         <div class="editor-day-badge">Day ${day.day}</div>
-        <div class="editor-day-theme">${day.theme||""}</div>
-        <span class="editor-day-count">${(day.activities||[]).length} activities</span>
+        <div class="editor-day-theme">${day.theme || ""}</div>
+        <span class="editor-day-count">${(day.activities || []).length} activities</span>
       </div>
-      <div class="editor-activities-list">${activitiesHTML||'<p class="no-acts">No activities yet.</p>'}</div>
+      <div class="editor-activities-list">${activitiesHTML || '<p class="no-acts">No activities yet.</p>'}</div>
     `;
     container.appendChild(dayCard);
   });
@@ -580,7 +564,7 @@ window.addCustomActivity = function() {
   const desc   = document.getElementById("newActivityDesc").value.trim();
   const cost   = document.getElementById("newActivityCost").value.trim();
   if (!name) { showEditorToast("Please enter an activity name", "error"); return; }
-  editingItinerary.days[dayIdx].activities.push({ time:time||"", name, desc, cost, type:"attraction" });
+  editingItinerary.days[dayIdx].activities.push({ time: time || "", name, desc, cost, type: "attraction" });
   renderDays();
   ["newActivityTime","newActivityName","newActivityDesc","newActivityCost"].forEach(id => {
     document.getElementById(id).value = "";
@@ -591,7 +575,7 @@ window.addCustomActivity = function() {
 
 window.backToSearch = function() {
   document.getElementById("itineraryEditorSection").style.display = "none";
-  window.scrollTo({ top:0, behavior:"smooth" });
+  window.scrollTo({ top: 0, behavior: "smooth" });
 };
 
 
@@ -599,17 +583,14 @@ window.backToSearch = function() {
 window.sendChatEdit = async function() {
   if (isGenerating) return;
 
-
   const input   = document.getElementById("editorChatInput");
   const msgText = input.value.trim();
   if (!msgText) return;
 
-
   isGenerating = true;
-  input.value = "";
+  input.value  = "";
   appendChatMessage("user", msgText);
   appendChatMessage("ai", "✦ Updating your itinerary…", true);
-
 
   try {
     const raw = await callAI(
@@ -632,13 +613,13 @@ window.sendChatEdit = async function() {
 };
 
 
-function appendChatMessage(role, text, isTyping=false, noHistory=false) {
+function appendChatMessage(role, text, isTyping = false, noHistory = false) {
   const box = document.getElementById("editorChatMessages");
   if (!box) return;
   const existing = box.querySelector(".typing-indicator");
   if (existing) existing.remove();
   const msg = document.createElement("div");
-  msg.className = `chat-msg chat-msg-${role}${isTyping?" typing-indicator":""}`;
+  msg.className = `chat-msg chat-msg-${role}${isTyping ? " typing-indicator" : ""}`;
   msg.textContent = text;
   box.appendChild(msg);
   box.scrollTop = box.scrollHeight;
@@ -646,7 +627,7 @@ function appendChatMessage(role, text, isTyping=false, noHistory=false) {
 }
 
 
-function showEditorToast(msg, type="success") {
+function showEditorToast(msg, type = "success") {
   let t = document.getElementById("editorToast");
   if (!t) {
     t = document.createElement("div");
@@ -665,32 +646,28 @@ function showEditorToast(msg, type="success") {
 // STEP 3 — FINALIZE → PLAN PAGE
 // ══════════════════════════════════════════════
 
-
 window.finalizeItinerary = function() {
   if (!editingItinerary) return;
   const city = parsedCity || localStorage.getItem("lastSearchedCity") || "Your Destination";
 
-
   const tripDays = editingItinerary.days.map(d => ({
-    label:    `Day ${d.day}: ${d.theme||""}`,
-    subLabel: `Day ${d.day}`,
-    activities: (d.activities||[]).map(a => ({
+    label:      `Day ${d.day}: ${d.theme || ""}`,
+    subLabel:   `Day ${d.day}`,
+    activities: (d.activities || []).map(a => ({
       time: a.time || "–",
       text: a.name + (a.desc ? ` — ${a.desc}` : ""),
-      cost: a.cost ? parseFloat(a.cost.replace(/[^0-9.]/g,""))||0 : 0
+      cost: a.cost ? parseFloat(a.cost.replace(/[^0-9.]/g,"")) || 0 : 0
     }))
   }));
 
-
-  localStorage.setItem("tripDays", JSON.stringify(tripDays));
-  localStorage.setItem("selectedDays", parsedDays);
-  localStorage.setItem("tripBudget", parsedBudget);
-  localStorage.setItem("lastSearchedCity", city);
-  localStorage.setItem("tripCurrency", parsedCurrency);
-  localStorage.setItem("finalItinerary", JSON.stringify(editingItinerary));
-  localStorage.setItem("tripItineraryTitle", editingItinerary.title||"My Itinerary");
-  localStorage.setItem("tripDatesLabel", parsedDatesLabel);
-
+  localStorage.setItem("tripDays",            JSON.stringify(tripDays));
+  localStorage.setItem("selectedDays",        parsedDays);
+  localStorage.setItem("tripBudget",          parsedBudget);
+  localStorage.setItem("lastSearchedCity",    city);
+  localStorage.setItem("tripCurrency",        parsedCurrency);
+  localStorage.setItem("finalItinerary",      JSON.stringify(editingItinerary));
+  localStorage.setItem("tripItineraryTitle",  editingItinerary.title || "My Itinerary");
+  localStorage.setItem("tripDatesLabel",      parsedDatesLabel);
 
   window.location.href = "plan.html";
 };
