@@ -179,7 +179,7 @@ window.toggleFoodPref = function(key) {
 };
 
 
-// ─── NL Parsing ───
+// ─── NL Parsing — AI-first with regex fallback ───
 let parseDebounce = null;
 nlInput.addEventListener("input", () => {
   const val = nlInput.value.trim();
@@ -190,10 +190,48 @@ nlInput.addEventListener("input", () => {
 });
 
 
-function parseInput(text) {
+async function parseInput(text) {
+  // Always run regex parse immediately for instant UI feedback
+  parseWithRegex(text);
+
+  // Then fire an AI parse in background for accuracy — updates UI when done
+  try {
+    const raw = await callAI(
+      "You are a travel query parser. Respond ONLY with a raw JSON object, no markdown.",
+      `Parse this travel query and extract structured data:
+"${text}"
+
+Return ONLY this JSON:
+{
+  "city": "city name only, no country (e.g. Tokyo, New York, Paris)",
+  "days": <number of days as integer, default 3>,
+  "budget": <numeric budget amount, default 5000>,
+  "currency": "<3-letter ISO code e.g. USD, CAD, GBP, EUR, JPY — default USD>",
+  "datesLabel": "<date range string if mentioned, else empty string>",
+  "startTime": "<start time if mentioned e.g. 9:00 AM, else 9:00 AM>"
+}`,
+      256
+    );
+    const parsed = parseJSON(raw);
+    if (parsed.city) {
+      parsedCity       = parsed.city;
+      parsedDays       = Math.max(1, Math.min(parseInt(parsed.days) || 3, 30));
+      parsedBudget     = parseFloat(parsed.budget) || 5000;
+      parsedCurrency   = parsed.currency || "USD";
+      parsedDatesLabel = parsed.datesLabel || "";
+      parsedStartTime  = parsed.startTime || "9:00 AM";
+      showParsedSummary();
+    }
+  } catch {
+    // AI parse failed — regex result already shown, no-op
+  }
+}
+
+
+function parseWithRegex(text) {
   const lower = text.toLowerCase();
 
-  // ─── START TIME — parsed FIRST ───
+  // ─── START TIME ───
   const timeMatch = lower.match(
     /(?:start(?:ing)?|begin(?:ning)?|kick\s*off)\s+(?:at\s+)?(\d{1,2})(?::(\d{2}))?\s*(am|pm)/
   );
@@ -308,20 +346,30 @@ function renderHistory() {
   if (!container) return;
   const history = getHistory();
   if (!history.length) { container.innerHTML = ""; return; }
-  container.innerHTML = `<span class="history-label">Recent:</span>
-    ${history.map(city => `<button onclick="fillCity('${city.replace(/'/g,"\\'")}') " class="history-chip">📍 ${city}</button>`).join("")}
-    <button onclick="clearHistory()" class="history-clear">✕ clear</button>`;
+
+  container.innerHTML = "";
+  const label = document.createElement("span");
+  label.className = "history-label";
+  label.textContent = "Recent:";
+  container.appendChild(label);
+
+  history.forEach(city => {
+    const btn = document.createElement("button");
+    btn.className = "history-chip";
+    btn.textContent = "📍 " + city;
+    btn.addEventListener("click", () => fillCity(city));
+    container.appendChild(btn);
+  });
+
+  const clearBtn = document.createElement("button");
+  clearBtn.className = "history-clear";
+  clearBtn.textContent = "✕ clear";
+  clearBtn.addEventListener("click", () => {
+    localStorage.removeItem("searchHistory");
+    renderHistory();
+  });
+  container.appendChild(clearBtn);
 }
-window.fillCity = function(city) {
-  nlInput.value = `I want to go to ${city}`;
-  discoverBtn.classList.add("active");
-  nlInput.focus();
-  parseInput(nlInput.value.trim());
-};
-window.clearHistory = function() {
-  localStorage.removeItem("searchHistory");
-  renderHistory();
-};
 
 
 // ─── Discover Button ───

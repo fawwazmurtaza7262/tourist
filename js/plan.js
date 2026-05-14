@@ -324,6 +324,7 @@ document.addEventListener("DOMContentLoaded", function() {
     renderHotelCard();
     renderBudgetTracker();
     setupChecklist();
+    setupFlightInfo();
 
     if (days.length === 0) {
       container.innerHTML = `<div class="empty-state" style="padding:40px; text-align:center;"><div style="font-size:3rem; margin-bottom:10px; opacity:0.3;">🗓️</div><p>No days yet.</p><button id="startEmptyBtn" style="margin-top:10px; padding:8px 16px; background:#C4623A; color:white; border:none; border-radius:6px; cursor:pointer; font-weight:600;">+ Add Day 1</button></div>`;
@@ -344,13 +345,26 @@ document.addEventListener("DOMContentLoaded", function() {
 
       const header = document.createElement("div");
       header.className = "day-header";
-      header.innerHTML = `
-        <div style="display:flex; flex-direction:column;">
-          <h3 style="margin-bottom:2px; font-size:1.1rem;">${day.label}</h3>
-          ${day.subLabel ? `<span style="font-size:0.75rem; color:#94a3b8; font-weight:600; text-transform:uppercase; letter-spacing:0.05em;">${day.subLabel}</span>` : ""}
-        </div>
-        <button class="delete-day-btn" title="Remove this day" data-day="${dayIndex}" style="font-size:0.8rem;">✕ Remove</button>
-      `;
+      const dayLabelDiv = document.createElement("div");
+      dayLabelDiv.style.cssText = "display:flex; flex-direction:column;";
+      const h3 = document.createElement("h3");
+      h3.style.cssText = "margin-bottom:2px; font-size:1.1rem;";
+      h3.textContent = day.label;
+      dayLabelDiv.appendChild(h3);
+      if (day.subLabel) {
+        const sub = document.createElement("span");
+        sub.style.cssText = "font-size:0.75rem; color:#94a3b8; font-weight:600; text-transform:uppercase; letter-spacing:0.05em;";
+        sub.textContent = day.subLabel;
+        dayLabelDiv.appendChild(sub);
+      }
+      const removeBtn = document.createElement("button");
+      removeBtn.className = "delete-day-btn";
+      removeBtn.title = "Remove this day";
+      removeBtn.dataset.day = dayIndex;
+      removeBtn.style.fontSize = "0.8rem";
+      removeBtn.textContent = "✕ Remove";
+      header.appendChild(dayLabelDiv);
+      header.appendChild(removeBtn);
       card.appendChild(header);
 
       if (day.activities.length === 0) {
@@ -366,17 +380,41 @@ document.addEventListener("DOMContentLoaded", function() {
           const isSaved = act.time === "Saved";
           const mapUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(act.text)}`;
 
-          row.innerHTML = `
-            <span class="time ${isSaved ? "saved-tag" : ""}">${act.time}</span>
-            <div style="display:flex; flex-direction:column; justify-content:center; margin-left:10px;">
-              <span class="activity-text">${act.text}</span>
-              ${act.cost ? `<span style="font-size:0.75rem; color:#15803d; font-weight:600;">$${act.cost}</span>` : ""}
-            </div>
-            <a href="${mapUrl}" target="_blank" title="Get Directions" style="margin-left:auto; margin-right:12px; text-decoration:none; color:#C4623A; font-size:0.85rem; font-weight:600; display:flex; align-items:center; gap:4px; border:1px solid #EDE3CC; padding:4px 8px; border-radius:20px; background:white;">
-              🚗 Navigate ↗
-            </a>
-            <button class="delete-btn" data-day="${dayIndex}" data-act="${actIndex}" title="Remove">✕</button>
-          `;
+          const timeSpan = document.createElement("span");
+          timeSpan.className = `time ${isSaved ? "saved-tag" : ""}`;
+          timeSpan.textContent = act.time;
+
+          const infoDiv = document.createElement("div");
+          infoDiv.style.cssText = "display:flex; flex-direction:column; justify-content:center; margin-left:10px;";
+          const actText = document.createElement("span");
+          actText.className = "activity-text";
+          actText.textContent = act.text;
+          infoDiv.appendChild(actText);
+          if (act.cost) {
+            const costSpan = document.createElement("span");
+            costSpan.style.cssText = "font-size:0.75rem; color:#15803d; font-weight:600;";
+            costSpan.textContent = `$${act.cost}`;
+            infoDiv.appendChild(costSpan);
+          }
+
+          const navLink = document.createElement("a");
+          navLink.href = mapUrl;
+          navLink.target = "_blank";
+          navLink.title = "Get Directions";
+          navLink.style.cssText = "margin-left:auto; margin-right:12px; text-decoration:none; color:#C4623A; font-size:0.85rem; font-weight:600; display:flex; align-items:center; gap:4px; border:1px solid #EDE3CC; padding:4px 8px; border-radius:20px; background:white;";
+          navLink.textContent = "🚗 Navigate ↗";
+
+          const delBtn = document.createElement("button");
+          delBtn.className = "delete-btn";
+          delBtn.dataset.day = dayIndex;
+          delBtn.dataset.act = actIndex;
+          delBtn.title = "Remove";
+          delBtn.textContent = "✕";
+
+          row.appendChild(timeSpan);
+          row.appendChild(infoDiv);
+          row.appendChild(navLink);
+          row.appendChild(delBtn);
           card.appendChild(row);
         });
       }
@@ -601,12 +639,36 @@ document.addEventListener("DOMContentLoaded", function() {
     });
   });
 
+  const DEFAULT_CHECKLIST = [
+    "Passport", "Travel Insurance", "Camera Gear", "Universal Adapter",
+    "Phone Charger", "Medications", "Local Currency", "Hotel Confirmation"
+  ];
+
   function setupChecklist() {
-    document.querySelectorAll('.sidebar input[type="checkbox"]').forEach((box, i) => {
+    const container = document.getElementById("packingChecklist");
+    if (!container) return;
+    container.innerHTML = "";
+    DEFAULT_CHECKLIST.forEach((item, i) => {
       const key = `checklist_item_${i}`;
-      if (localStorage.getItem(key) === "true") box.checked = true;
+      const checked = localStorage.getItem(key) === "true";
+      const div = document.createElement("div");
+      const label = document.createElement("label");
+      const box = document.createElement("input");
+      box.type = "checkbox";
+      box.checked = checked;
       box.addEventListener("change", () => localStorage.setItem(key, box.checked));
+      label.appendChild(box);
+      label.appendChild(document.createTextNode(" " + item));
+      div.appendChild(label);
+      container.appendChild(div);
     });
+  }
+
+  function setupFlightInfo() {
+    const textarea = document.getElementById("flightInfo");
+    if (!textarea) return;
+    textarea.value = localStorage.getItem("flightInfo") || "";
+    textarea.addEventListener("input", () => localStorage.setItem("flightInfo", textarea.value));
   }
 
   const toggleBtn = document.getElementById("mapToggleBtn");
