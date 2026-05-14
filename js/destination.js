@@ -336,11 +336,13 @@ function showParsedSummary() {
 
 // ─── Search History ───
 function getHistory() { return JSON.parse(localStorage.getItem("searchHistory")) || []; }
-function saveToHistory(city) {
-  let h = getHistory().filter(c => c.toLowerCase() !== city.toLowerCase());
-  h.unshift(city); h = h.slice(0, 6);
+function saveToHistory(city, fullQuery) {
+  let h = getHistory().filter(c => c.city.toLowerCase() !== city.toLowerCase());
+  h.unshift({ city, query: fullQuery });
+  h = h.slice(0, 6);
   localStorage.setItem("searchHistory", JSON.stringify(h));
 }
+
 function renderHistory() {
   const container = document.getElementById("searchHistory");
   if (!container) return;
@@ -353,11 +355,16 @@ function renderHistory() {
   label.textContent = "Recent:";
   container.appendChild(label);
 
-  history.forEach(city => {
+  history.forEach(item => {
     const btn = document.createElement("button");
     btn.className = "history-chip";
-    btn.textContent = "📍 " + city;
-    btn.addEventListener("click", () => fillCity(city));
+    btn.textContent = "📍 " + item.city;
+    btn.addEventListener("click", () => {
+      nlInput.value = item.query;
+      discoverBtn.classList.add("active");
+      nlInput.focus();
+      parseWithRegex(item.query);
+    });
     container.appendChild(btn);
   });
 
@@ -371,6 +378,12 @@ function renderHistory() {
   container.appendChild(clearBtn);
 }
 
+window.fillCity = function(city) {
+  nlInput.value = `I want to go to ${city}`;
+  discoverBtn.classList.add("active");
+  nlInput.focus();
+  parseWithRegex(nlInput.value.trim());
+};
 
 // ─── Discover Button ───
 discoverBtn.addEventListener("click", () => {
@@ -393,7 +406,7 @@ discoverBtn.addEventListener("click", () => {
   localStorage.setItem("tripCurrency",     parsedCurrency);
   localStorage.setItem("tripDatesLabel",   parsedDatesLabel);
   localStorage.setItem("tripFoodPrefs",    JSON.stringify(selectedFoodPrefs));
-  saveToHistory(rawCity);
+  saveToHistory(rawCity, nlInput.value.trim());
 
   showLoadingSection(rawCity);
 });
